@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import AppHeader from "../components/AppHeader";
 
 export default function LoginPage() {
   const { signIn } = useAuth();
@@ -25,8 +26,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-16">
-      <h1 className="text-2xl font-bold text-center mb-8">Đăng nhập</h1>
+    <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", flexDirection: "column" }}>
+      <AppHeader />
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
+        <div style={{ width: "100%", maxWidth: 440 }}>
+          <h1 style={{ fontSize: "1.75rem", fontWeight: 800, textAlign: "center", marginBottom: "2rem", color: "#0f172a" }}>Đăng nhập</h1>
       <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow border space-y-4">
         {error && <p className="text-red-500 text-sm">{error}</p>}
         <div>
@@ -63,6 +67,8 @@ export default function LoginPage() {
           </Link>
         </p>
       </form>
+        </div>
+      </div>
     </div>
   );
 }
