@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import {
   ArrowLeftIcon,
   ArrowDownTrayIcon,
@@ -22,24 +22,43 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../contexts/AuthContext';
-import { apiFetch, type Report, type Session } from '../lib/api';
+import { apiFetch, type Session } from '../lib/api';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
-const containerVariants = {
+// Định nghĩa interface độc lập để tránh lỗi xung đột (extends) với type Report gốc
+interface ReportData {
+  overall_score?: number;
+  avg_content?: number;
+  avg_relevance?: number;
+  avg_completeness?: number;
+  avg_presentation?: number;
+  summary?: string;
+  pdf_url?: string;
+  cv_suggestions?: Array<{ section: string; suggestion: string }>;
+  evaluations?: Array<{
+    category: string;
+    question_text: string;
+    score_overall?: number;
+    feedback: string;
+    sample_answer?: string;
+  }>;
+}
+
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.1 } },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 30, scale: 0.95 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 100, damping: 15 } },
 };
 
 export default function ReportPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { accessToken } = useAuth();
-  const [report, setReport] = useState<Report | null>(null);
+  const [report, setReport] = useState<ReportData | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -81,7 +100,7 @@ export default function ReportPage() {
         }
 
         // Da hoan thanh -> lay report
-        const data = await apiFetch<Report>(
+        const data = await apiFetch<ReportData>(
           `/sessions/${sessionId}/report`,
           {},
           accessToken
@@ -101,11 +120,11 @@ export default function ReportPage() {
       }
     };
 
-    let intervalId: number | undefined;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
 
     fetchReport().then((done) => {
       if (done) return;
-      intervalId = window.setInterval(async () => {
+      intervalId = setInterval(async () => {
         const isDone = await fetchReport();
         if (isDone && intervalId) clearInterval(intervalId);
       }, 5000);
@@ -127,15 +146,22 @@ export default function ReportPage() {
 
   const chartData = report
     ? [
-        { subject: 'Nội dung', score: report.avg_content },
-        { subject: 'Liên quan', score: report.avg_relevance },
-        { subject: 'Đầy đủ', score: report.avg_completeness },
-        { subject: 'Trình bày', score: report.avg_presentation },
+        { subject: 'Nội dung', score: report?.avg_content || 0 },
+        { subject: 'Liên quan', score: report?.avg_relevance || 0 },
+        { subject: 'Đầy đủ', score: report?.avg_completeness || 0 },
+        { subject: 'Trình bày', score: report?.avg_presentation || 0 },
       ]
     : [];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 pb-20 font-sans min-h-screen">
+    <div className="max-w-6xl mx-auto px-4 py-8 pb-20 font-sans min-h-screen relative">
+      {/* Background Decorative Blur Blobs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-violet-400/10 blur-[120px]" />
+        <div className="absolute top-[30%] -right-[10%] w-[35%] h-[35%] rounded-full bg-indigo-400/10 blur-[100px]" />
+        <div className="absolute -bottom-[10%] left-[10%] w-[40%] h-[40%] rounded-full bg-emerald-400/10 blur-[120px]" />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -160,7 +186,7 @@ export default function ReportPage() {
         <div className="flex items-center gap-3">
           {report?.pdf_url && (
             <a
-              href={report.pdf_url}
+              href={report?.pdf_url}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl font-bold hover:bg-slate-50 hover:text-violet-600 transition-colors shadow-sm text-sm"
@@ -185,10 +211,11 @@ export default function ReportPage() {
                   a.click();
                 });
             }}
-            className="flex items-center gap-2 text-white bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 rounded-xl font-bold hover:shadow-[0_10px_25px_rgba(124,58,237,0.3)] hover:-translate-y-0.5 transition-all shadow-sm text-sm"
+        className="flex items-center gap-2 text-white bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 rounded-xl font-bold hover:shadow-[0_10px_25px_rgba(124,58,237,0.4)] hover:-translate-y-1 transition-all shadow-sm text-sm relative overflow-hidden group"
           >
-            <DocumentTextIcon className="w-4 h-4 stroke-[2.5]" />
-            Tải PDF (API)
+        <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out" />
+        <DocumentTextIcon className="w-4 h-4 stroke-[2.5] relative z-10" />
+        <span className="relative z-10">Tải PDF (API)</span>
           </a>
         </div>
       </motion.div>
@@ -219,29 +246,32 @@ export default function ReportPage() {
               >
                 <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-white opacity-10 group-hover:scale-150 transition-transform duration-700"></div>
                 <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 rounded-full bg-indigo-500 opacity-20 blur-xl"></div>
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="absolute -top-16 -left-16 w-48 h-48 border border-white/10 rounded-full border-dashed pointer-events-none"></motion.div>
 
                 <h3 className="text-violet-100 font-bold text-sm uppercase tracking-widest mb-2 relative z-10">
                   Điểm đánh giá tổng thể
                 </h3>
                 <div className="flex items-end justify-center gap-1 relative z-10 mb-4">
-                  <span className="text-6xl font-black">{report.overall_score.toFixed(1)}</span>
+              <motion.span animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }} className="text-6xl font-black drop-shadow-md">
+                {(report?.overall_score || 0).toFixed(1)}
+              </motion.span>
                   <span className="text-2xl font-bold text-violet-300 mb-1.5">/10</span>
                 </div>
 
                 <div className="inline-flex items-center justify-center gap-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full text-sm font-semibold relative z-10 w-max mx-auto">
                   <StarIcon className="w-4 h-4 text-amber-400" />
-                  {report.overall_score >= 8
+                  {(report?.overall_score || 0) >= 8
                     ? 'Rất xuất sắc'
-                    : report.overall_score >= 6
+                    : (report?.overall_score || 0) >= 6
                     ? 'Khá tốt'
-                    : report.overall_score >= 4
+                    : (report?.overall_score || 0) >= 4
                     ? 'Cần cố gắng'
                     : 'Cần nỗ lực nhiều'}
                 </div>
               </motion.div>
 
               {/* CV Suggestions Mini Card */}
-              {report.cv_suggestions && report.cv_suggestions.length > 0 ? (
+              {(report?.cv_suggestions?.length || 0) > 0 ? (
                 <motion.div
                   variants={itemVariants}
                   className="flex-1 flex flex-col justify-between bg-gradient-to-br from-emerald-50 to-teal-50/50 rounded-3xl p-6 border border-emerald-100 shadow-sm relative overflow-hidden group cursor-pointer"
@@ -252,12 +282,16 @@ export default function ReportPage() {
                   </div>
                   <div className="relative z-10 flex flex-col gap-4 mb-4">
                     <div>
-                      <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-3 shadow-inner">
+                    <motion.div 
+                      animate={{ y: [0, -6, 0] }} 
+                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} 
+                      className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-3 shadow-inner"
+                    >
                         <SparklesIcon className="w-5 h-5 stroke-[2.5]" />
-                      </div>
+                    </motion.div>
                       <h3 className="text-lg font-bold text-slate-800 mb-1">Cải thiện CV</h3>
                       <p className="text-sm font-medium text-slate-600">
-                        AI đã tìm thấy {report.cv_suggestions.length} điểm có thể nâng cấp trong CV của bạn so với Job
+                        AI đã tìm thấy {report?.cv_suggestions?.length || 0} điểm có thể nâng cấp trong CV của bạn so với Job
                         Description.
                       </p>
                     </div>
@@ -300,7 +334,9 @@ export default function ReportPage() {
                 className="h-full flex flex-col bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.04)]"
               >
                 <h3 className="text-lg font-extrabold text-slate-800 mb-6 flex items-center gap-2">
-                  <ChartBarIcon className="w-5 h-5 text-violet-500 stroke-[2.5]" />
+              <motion.div animate={{ scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
+                <ChartBarIcon className="w-5 h-5 text-violet-500 stroke-[2.5]" />
+              </motion.div>
                   Phân tích 4 tiêu chí
                 </h3>
                 <div className="flex-1 min-h-[300px] w-full -ml-2">
@@ -321,7 +357,7 @@ export default function ReportPage() {
                       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
                         {item.subject}
                       </span>
-                      <span className="text-lg font-black text-slate-800">{item.score.toFixed(1)}</span>
+                      <span className="text-lg font-black text-slate-800">{(item.score || 0).toFixed(1)}</span>
                     </div>
                   ))}
                 </div>
@@ -335,12 +371,13 @@ export default function ReportPage() {
             className="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.03)] relative overflow-hidden"
           >
             <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-violet-500 to-indigo-500"></div>
+        <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-amber-100/50 rounded-full blur-3xl pointer-events-none"></div>
             <h2 className="text-xl font-extrabold text-slate-800 mb-4 flex items-center gap-2">
               <LightBulbIcon className="w-6 h-6 text-amber-500 stroke-[2.5]" />
               Tổng nhận xét của AI
             </h2>
             <div className="prose prose-slate max-w-none text-slate-600 font-medium leading-relaxed">
-              <p className="whitespace-pre-wrap">{report.summary}</p>
+              <p className="whitespace-pre-wrap">{report?.summary || ''}</p>
             </div>
           </motion.div>
 
@@ -354,26 +391,29 @@ export default function ReportPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 items-start mt-4">
               {/* Cột trái (25%): Danh sách câu hỏi */}
               <div className="md:col-span-1 flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1 pb-2" style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}>
-                {report.evaluations.map((ev, i) => (
+                {(report?.evaluations || []).map((ev, i) => (
                   <button
                     key={i}
                     onClick={() => setSelectedQuestionIndex(i)}
                     className={`w-full text-left p-3.5 rounded-xl border transition-all duration-200 flex flex-col gap-1.5 hover:-translate-y-0.5 ${
                       selectedQuestionIndex === i
-                        ? 'bg-violet-50 border-violet-200 shadow-[0_4px_15px_rgba(124,58,237,0.08)]'
+                    ? 'bg-violet-50 border-violet-200 shadow-[0_4px_15px_rgba(124,58,237,0.08)] ring-1 ring-violet-500/10'
                         : 'bg-white border-slate-100 hover:border-violet-100 hover:bg-slate-50 hover:shadow-sm'
                     }`}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <span className={`font-bold text-sm ${selectedQuestionIndex === i ? 'text-violet-700' : 'text-slate-700'}`}>
-                        Câu {i + 1}
-                      </span>
+                  <div className={`font-bold text-sm flex items-center gap-2 ${selectedQuestionIndex === i ? 'text-violet-700' : 'text-slate-700'}`}>
+                    {selectedQuestionIndex === i && (
+                      <motion.div layoutId="questionDot" className="w-1.5 h-1.5 rounded-full bg-violet-600" />
+                    )}
+                    Câu {i + 1}
+                  </div>
                       <span
                         className={`text-sm font-black bg-white px-2.5 py-0.5 rounded-md shadow-sm border border-slate-100 ${
-                          ev.score_overall >= 8 ? 'text-emerald-600' : ev.score_overall >= 5 ? 'text-amber-500' : 'text-red-500'
+                          (ev.score_overall || 0) >= 8 ? 'text-emerald-600' : (ev.score_overall || 0) >= 5 ? 'text-amber-500' : 'text-red-500'
                         }`}
                       >
-                        {ev.score_overall.toFixed(1)}
+                        {(ev.score_overall || 0).toFixed(1)}
                       </span>
                     </div>
                     <span className="text-xs text-slate-500 font-medium line-clamp-1">{ev.category}</span>
@@ -383,16 +423,18 @@ export default function ReportPage() {
 
               {/* Cột phải (75%): Chi tiết câu hỏi đã chọn */}
               <div className="md:col-span-3 bg-white rounded-3xl border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.03)] overflow-hidden">
+                <AnimatePresence mode="wait">
                 {(() => {
-                  const ev = report.evaluations[selectedQuestionIndex];
+                  const ev = (report?.evaluations || [])[selectedQuestionIndex];
                   if (!ev) return null;
                   
                   return (
                     <motion.div
                       key={selectedQuestionIndex} // Kích hoạt animation mỗi khi index thay đổi
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ duration: 0.4, type: "spring", bounce: 0.3 }}
                       className="p-5 md:p-6 lg:p-8"
                     >
                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-5 mb-6">
@@ -411,10 +453,10 @@ export default function ReportPage() {
                           <span className="text-xs font-bold text-slate-400 uppercase mb-0.5 tracking-wider">Điểm</span>
                           <span
                             className={`text-2xl font-black ${
-                              ev.score_overall >= 8 ? 'text-emerald-600' : ev.score_overall >= 5 ? 'text-amber-500' : 'text-red-500'
+                              (ev.score_overall || 0) >= 8 ? 'text-emerald-600' : (ev.score_overall || 0) >= 5 ? 'text-amber-500' : 'text-red-500'
                             }`}
                           >
-                            {ev.score_overall.toFixed(1)}
+                            {(ev.score_overall || 0).toFixed(1)}
                           </span>
                         </div>
                       </div>
@@ -428,20 +470,23 @@ export default function ReportPage() {
                       </div>
 
                       {ev.sample_answer && (
-                        <div className="bg-gradient-to-br from-violet-50/80 to-indigo-50/50 rounded-2xl p-5 border border-violet-100/50 text-sm shadow-sm relative overflow-hidden group">
-                          <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                            <SparklesIcon className="w-20 h-20 text-violet-600" />
+                        <div className="bg-emerald-50/60 rounded-2xl p-5 border border-emerald-100 shadow-sm relative overflow-hidden group mt-2">
+                          <div className="absolute top-0 right-0 p-3 opacity-[0.05] group-hover:scale-125 group-hover:rotate-12 transition-transform duration-500">
+                            <SparklesIcon className="w-20 h-20 text-emerald-600" />
                           </div>
-                          <strong className="flex items-center gap-1.5 text-violet-800 mb-3 font-bold text-base relative z-10">
+                          <strong className="flex items-center gap-1.5 text-emerald-800 mb-3 font-bold text-base relative z-10">
                             <CheckCircleIcon className="w-5 h-5 stroke-[2.5]" />
                             Câu trả lời mẫu xuất sắc
                           </strong>
-                          <p className="text-violet-900/80 font-medium leading-relaxed italic relative z-10">"{ev.sample_answer}"</p>
+                          <div className="text-slate-700 font-medium leading-relaxed relative z-10 bg-white/70 p-4 rounded-xl shadow-sm border border-emerald-50/50">
+                            {ev.sample_answer}
+                          </div>
                         </div>
                       )}
                     </motion.div>
                   );
                 })()}
+            </AnimatePresence>
               </div>
             </div>
           </motion.div>

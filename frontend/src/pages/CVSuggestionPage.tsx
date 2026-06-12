@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { SparklesIcon, ArrowLeftIcon, ExclamationTriangleIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
-import { apiFetch, type Report } from '../lib/api';
+import { apiFetch } from '../lib/api';
+
+interface ReportData {
+  cv_suggestions?: Array<{ section: string; suggestion: string }>;
+}
 
 export default function CVSuggestionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { accessToken } = useAuth();
-  const [report, setReport] = useState<Report | null>(null);
+  const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -16,7 +20,7 @@ export default function CVSuggestionPage() {
 
     const fetchReport = async () => {
       try {
-        const data = await apiFetch<Report>(
+        const data = await apiFetch<ReportData>(
           `/sessions/${sessionId}/report`,
           {},
           accessToken
@@ -45,7 +49,9 @@ export default function CVSuggestionPage() {
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-20 animate-fade-in font-sans">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Gợi ý nâng cấp CV</h1>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            Gợi ý <span className="text-emerald-600">nâng cấp CV</span>
+          </h1>
           <p className="text-slate-500 mt-2 font-medium flex items-center gap-2">
             <DocumentTextIcon className="w-5 h-5 text-emerald-500" /> 
             Dựa trên kết quả phân tích AI và mô tả công việc
@@ -69,8 +75,8 @@ export default function CVSuggestionPage() {
 
       {report && (
         <div className="grid gap-6">
-          {report.cv_suggestions.length > 0 ? (
-            report.cv_suggestions.map((s, i) => (
+          {(report?.cv_suggestions?.length || 0) > 0 ? (
+            (report?.cv_suggestions || []).map((s, i) => (
               <div key={i} className="bg-white rounded-3xl p-6 md:p-8 shadow-[0_10px_30px_rgba(16,185,129,0.04)] border border-emerald-50 relative overflow-hidden group hover:shadow-[0_15px_35px_rgba(16,185,129,0.1)] transition-all duration-300">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50/50 rounded-bl-full -mr-16 -mt-16 transition-transform duration-500 group-hover:scale-110"></div>
                 <div className="flex items-start gap-5">
