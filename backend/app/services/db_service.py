@@ -76,7 +76,7 @@ class DatabaseService:
     def list_sessions(self, user_id: str) -> list[dict]:
         return (
             self._table("interview_sessions")
-            .select("*")
+            .select("*, report:interview_reports(overall_score, avg_content, avg_relevance, avg_completeness, avg_presentation)")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .execute()

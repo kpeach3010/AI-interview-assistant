@@ -12,6 +12,27 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 def _session_to_response(s: dict) -> SessionResponse:
+    report = s.get("report") or {}
+    overall_score = None
+    avg_content = None
+    avg_relevance = None
+    avg_completeness = None
+    avg_presentation = None
+
+    if isinstance(report, list) and len(report) > 0:
+        rep = report[0]
+    elif isinstance(report, dict):
+        rep = report
+    else:
+        rep = {}
+
+    if rep:
+        overall_score = float(rep["overall_score"]) if rep.get("overall_score") is not None else None
+        avg_content = float(rep["avg_content"]) if rep.get("avg_content") is not None else None
+        avg_relevance = float(rep["avg_relevance"]) if rep.get("avg_relevance") is not None else None
+        avg_completeness = float(rep["avg_completeness"]) if rep.get("avg_completeness") is not None else None
+        avg_presentation = float(rep["avg_presentation"]) if rep.get("avg_presentation") is not None else None
+
     return SessionResponse(
         id=s["id"],
         title=s.get("title"),
@@ -22,6 +43,11 @@ def _session_to_response(s: dict) -> SessionResponse:
         current_question_index=s.get("current_question_index", 0),
         created_at=s["created_at"],
         error_message=s.get("error_message"),
+        overall_score=overall_score,
+        avg_content=avg_content,
+        avg_relevance=avg_relevance,
+        avg_completeness=avg_completeness,
+        avg_presentation=avg_presentation,
     )
 
 

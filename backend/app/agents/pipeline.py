@@ -44,9 +44,10 @@ async def run_document_pipeline(session_id: str) -> None:
             session.get("language", "vi"),
         )
 
+        title_prefix = "Phỏng vấn" if session.get("language") == "vi" else "Interview"
         db.update_session(
             session_id,
-            {"status": "ready", "title": f"Phong van {session['position_applied']}"},
+            {"status": "ready", "title": f"{title_prefix} {session['position_applied']}"},
         )
     except Exception as exc:
         logger.exception("Pipeline failed for session %s", session_id)

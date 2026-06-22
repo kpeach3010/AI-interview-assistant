@@ -32,6 +32,9 @@ async def get_report(session_id: str, user: Annotated[dict, Depends(get_current_
 
     cv_suggestions = report.get("cv_suggestions") or []
 
+    profile = db.get_candidate_profile(session_id) or {}
+    jd_gap_analysis = profile.get("jd_gap_analysis") if isinstance(profile, dict) else None
+
     return ReportResponse(
         session_id=session_id,
         overall_score=float(report["overall_score"]),
@@ -43,6 +46,7 @@ async def get_report(session_id: str, user: Annotated[dict, Depends(get_current_
         cv_suggestions=cv_suggestions if isinstance(cv_suggestions, list) else [],
         evaluations=[
             {
+                "question_id": e["question_id"],
                 "question_text": (e.get("questions") or {}).get("question_text", ""),
                 "category": (e.get("questions") or {}).get("category", ""),
                 "score_content": float(e["score_content"]),
@@ -58,6 +62,7 @@ async def get_report(session_id: str, user: Annotated[dict, Depends(get_current_
             for e in evaluations
         ],
         pdf_url=pdf_url,
+        jd_gap_analysis=jd_gap_analysis,
     )
 
 

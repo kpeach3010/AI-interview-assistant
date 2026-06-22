@@ -26,6 +26,11 @@ class SessionResponse(BaseModel):
     current_question_index: int
     created_at: str
     error_message: str | None = None
+    overall_score: float | None = None
+    avg_content: float | None = None
+    avg_relevance: float | None = None
+    avg_completeness: float | None = None
+    avg_presentation: float | None = None
 
 
 class QuestionResponse(BaseModel):
@@ -47,3 +52,4 @@ class ReportResponse(BaseModel):
     cv_suggestions: list
     evaluations: list = Field(default_factory=list)
     pdf_url: str | None = None
+    jd_gap_analysis: dict | None = None

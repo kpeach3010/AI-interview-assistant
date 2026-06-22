@@ -48,6 +48,11 @@ export interface Session {
   current_question_index: number;
   created_at: string;
   error_message?: string | null;
+  overall_score?: number | null;
+  avg_content?: number | null;
+  avg_relevance?: number | null;
+  avg_completeness?: number | null;
+  avg_presentation?: number | null;
 }
 
 export interface Report {
