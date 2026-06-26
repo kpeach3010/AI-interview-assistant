@@ -147,18 +147,43 @@ Vi tri: {session['position_applied']}
     overall_score = round(_weighted_overall(averages), 2)
 
     profile = db.get_candidate_profile(session_id)
-    profile_data = {"jd_gap_analysis": profile.get("jd_gap_analysis", {})} if profile else {}
+    if profile:
+        profile_data = {
+            "skills": profile.get("skills", []),
+            "experiences": profile.get("experiences", []),
+            "projects": profile.get("projects", []),
+            "education": profile.get("education", []),
+            "achievements": profile.get("achievements", []),
+            "jd_gap_analysis": profile.get("jd_gap_analysis", {})
+        }
+    else:
+        profile_data = {}
 
-    summary_prompt = f"""Tong hop bao cao phong van.
-Diem trung binh: {overall_score}/10
-Trung binh tung tieu chi: {json.dumps(averages)}
-Ho so: {json.dumps(profile_data, ensure_ascii=False)[:2000]}
+    interview_details = []
+    for e in evaluations:
+        interview_details.append({
+            "question": e["question"]["question_text"],
+            "category": e["question"]["category"],
+            "answer": answers_by_question.get(e["question"]["id"], ""),
+            "score": e["evaluation"]["score_overall"],
+            "feedback": e["evaluation"]["feedback"]
+        })
 
-Tra ve JSON:
-{{"overall_score": {overall_score}, "summary": "...", "cv_suggestions": [{{"section": "...", "suggestion": "...", "priority": "high|medium|low"}}]}}
+    summary_prompt = f"""Chi tiết buổi phỏng vấn:
+{json.dumps(interview_details, ensure_ascii=False)}
+
+Dữ liệu CV hiện tại của ứng viên:
+{json.dumps(profile_data, ensure_ascii=False)}
+
+Vị trí ứng tuyển: {session.get('position_applied')}
+Lĩnh vực: {session.get('industry', 'Khong xac dinh')}
+Điểm trung bình: {overall_score}/10
+Điểm trung bình từng tiêu chí: {json.dumps(averages)}
 """
+    summarizer_system_template = _load_prompt("summarizer.txt")
+    summarizer_system = summarizer_system_template.format(language=session.get("language", "vi"))
     try:
-        summary_data, _ = await llm_router.generate_json(summary_prompt, system)
+        summary_data, _ = await llm_router.generate_json(summary_prompt, summarizer_system)
     except Exception:
         summary_data = {}
 
