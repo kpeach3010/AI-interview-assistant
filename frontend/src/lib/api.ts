@@ -1,5 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL as string;
 
+
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -18,9 +26,24 @@ export async function apiFetch<T>(
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Request failed");
+    throw new ApiError(res.status, err.detail || "Request failed");
   }
   return res.json();
+}
+
+export interface DocumentResponse {
+  id: string;
+  file_name: string;
+  type: string;
+  created_at: string;
+}
+
+export async function getDocuments(docType: "cv" | "jd", token: string) {
+  return apiFetch<DocumentResponse[]>(`/documents?doc_type=${docType}`, {}, token);
+}
+
+export async function getDocumentUrl(docId: string, token: string) {
+  return apiFetch<{ url: string }>(`/documents/${docId}/url`, {}, token);
 }
 
 export async function uploadDocument(

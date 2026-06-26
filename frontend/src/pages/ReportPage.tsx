@@ -21,11 +21,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../contexts/AuthContext';
-import { apiFetch, type Session } from '../lib/api';
+import { apiFetch, ApiError, type Session } from '../lib/api';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
-// Định nghĩa interface độc lập để tránh lỗi xung đột (extends) với type Report gốc
+// Define an independent interface to avoid conflict with the original Report type
 interface ReportData {
   overall_score?: number;
   avg_content?: number;
@@ -147,9 +147,9 @@ export default function ReportPage() {
     if (!sessionId || !accessToken) return;
 
     let attempts = 0;
-    const MAX_ATTEMPTS = 24; // ~2 phút voi interval 5s
+    const MAX_ATTEMPTS = 24; // ~2 minutes with 5s interval
 
-    // Tra ve true neu da dung (xong / loi / het luot), false neu can poll tiep
+    // Return true if finished (done/error/timeout), false to continue polling
     const fetchReport = async (): Promise<boolean> => {
       attempts += 1;
       try {
@@ -160,14 +160,14 @@ export default function ReportPage() {
         );
         setSession(sess);
 
-        // Phien loi -> dung han, khong goi /report nua
+        // Session error -> stop immediately, do not call /report again
         if (sess.status === 'failed') {
           setError(sess.error_message || 'Đánh giá thất bại. Vui lòng thử lại.');
           setLoading(false);
           return true;
         }
 
-        // Con dang xu ly -> cho tiep
+        // Still processing -> keep waiting
         if (sess.status === 'evaluating' || sess.status === 'active') {
           setError('Đang đánh giá, vui lòng đợi...');
           if (attempts >= MAX_ATTEMPTS) {
@@ -178,7 +178,7 @@ export default function ReportPage() {
           return false;
         }
 
-        // Da hoan thanh -> lay report
+        // Completed -> fetch report
         const data = await apiFetch<ReportData>(
           `/sessions/${sessionId}/report`,
           {},
@@ -189,7 +189,13 @@ export default function ReportPage() {
         setLoading(false);
         return true;
       } catch (err) {
-        // Report chua san sang (404) -> thu lai toi gioi han
+        // If 401 (token expired) -> stop immediately
+        if (err instanceof ApiError && err.status === 401) {
+          setError('Phiên đăng nhập đã hết hạn. Vui lòng tải lại trang để đăng nhập lại.');
+          setLoading(false);
+          return true; // Stop immediately
+        }
+        // Report not ready yet (404) -> retry until limit
         setError(err instanceof Error ? err.message : 'Chưa có báo cáo');
         if (attempts >= MAX_ATTEMPTS) {
           setLoading(false);
@@ -309,7 +315,7 @@ export default function ReportPage() {
           className="space-y-8"
         >
           <div className="grid lg:grid-cols-3 gap-6 items-stretch">
-            {/* Cột trái (33%): Score & CV Suggestions */}
+            {/* Left Column (33%): Score & CV Suggestions */}
             <div className="lg:col-span-1 flex flex-col gap-6">
               {/* Score Card */}
               <motion.div
@@ -399,7 +405,7 @@ export default function ReportPage() {
               )}
             </div>
 
-            {/* Cột phải (67%): Radar Chart Card */}
+            {/* Right Column (67%): Radar Chart Card */}
             <div className="lg:col-span-2">
               <motion.div
                 variants={itemVariants}
@@ -461,7 +467,7 @@ export default function ReportPage() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 items-start mt-4">
-              {/* Cột trái (25%): Danh sách câu hỏi */}
+              {/* Left Column (25%): Questions List */}
               <div className="md:col-span-1 flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1 pb-2" style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}>
                 {(report?.evaluations || []).map((ev, i) => (
                   <button
@@ -493,7 +499,7 @@ export default function ReportPage() {
                 ))}
               </div>
 
-              {/* Cột phải (75%): Chi tiết câu hỏi đã chọn */}
+              {/* Right Column (75%): Selected Question Details */}
               <div className="md:col-span-3 bg-white rounded-3xl border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.03)] overflow-hidden">
                 <AnimatePresence mode="wait">
                 {(() => {
@@ -502,7 +508,7 @@ export default function ReportPage() {
                   
                   return (
                     <motion.div
-                      key={selectedQuestionIndex} // Kích hoạt animation mỗi khi index thay đổi
+                      key={selectedQuestionIndex} // Trigger animation when index changes
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -20 }}
