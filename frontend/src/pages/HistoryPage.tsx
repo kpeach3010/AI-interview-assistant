@@ -29,9 +29,11 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis
 } from "recharts";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -117,10 +119,10 @@ export default function HistoryPage() {
   );
 
   const criteriaData = [
-    { name: "Nội dung", score: totalCompleted ? Number((avgScores.content / totalCompleted).toFixed(1)) : 0, color: "#3b82f6" },
-    { name: "Liên quan", score: totalCompleted ? Number((avgScores.relevance / totalCompleted).toFixed(1)) : 0, color: "#10b981" },
-    { name: "Đầy đủ", score: totalCompleted ? Number((avgScores.completeness / totalCompleted).toFixed(1)) : 0, color: "#f59e0b" },
-    { name: "Trình bày", score: totalCompleted ? Number((avgScores.presentation / totalCompleted).toFixed(1)) : 0, color: "#8b5cf6" },
+    { name: "Nội dung", score: totalCompleted ? Number((avgScores.content / totalCompleted).toFixed(1)) : 0 },
+    { name: "Liên quan", score: totalCompleted ? Number((avgScores.relevance / totalCompleted).toFixed(1)) : 0 },
+    { name: "Đầy đủ", score: totalCompleted ? Number((avgScores.completeness / totalCompleted).toFixed(1)) : 0 },
+    { name: "Trình bày", score: totalCompleted ? Number((avgScores.presentation / totalCompleted).toFixed(1)) : 0 },
   ];
 
   useEffect(() => {
@@ -195,7 +197,7 @@ export default function HistoryPage() {
             </div>
           </motion.div>
 
-          {/* Stats Component - Chuyển sang cột trái */}
+          {/* Stats Component */}
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -486,32 +488,157 @@ export default function HistoryPage() {
                       </div>
                     </div>
 
-                    {/* Criteria Average Chart */}
+                    {/* Criteria Average Chart (Radar Chart) */}
                     <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-sm flex flex-col h-[350px]">
                       <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                         <ChartPieIcon className="w-4 h-4 text-emerald-600" />
-                        Điểm tiêu chí trung bình
+                        Ma trận kỹ năng đa chiều (Radar Skill Matrix)
                       </h4>
-                      <div className="flex-1 min-h-0 w-full">
+                      <div className="flex-1 min-h-0 w-full flex items-center justify-center">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={criteriaData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} />
-                            <YAxis domain={[0, 10]} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} />
-                            <RechartsTooltip 
-                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-                              formatter={(value: any) => [`${value} / 10`, 'Điểm trung bình']}
-                            />
-                            <Bar dataKey="score" radius={[8, 8, 0, 0]} maxBarSize={45}>
-                              {criteriaData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Bar>
-                          </BarChart>
+                          <RadarChart cx="50%" cy="50%" outerRadius="70%" data={criteriaData}>
+                            <PolarGrid stroke="#e2e8f0" />
+                            <PolarAngleAxis dataKey="name" tick={{ fill: '#475569', fontSize: 12, fontWeight: 'bold' }} />
+                            <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#64748b', fontSize: 10 }} />
+                            <Radar name="Điểm trung bình" dataKey="score" stroke="#10b981" fill="#10b981" fillOpacity={0.2} />
+                            <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+                          </RadarChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
                   </div>
+
+                  {/* Personalized Learning Path */}
+                  {completedCount > 0 && (
+                    <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-6 mt-6">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div>
+                          <h4 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                            <SparklesIcon className="w-5 h-5 text-violet-600" />
+                            Lộ trình học tập & Cải thiện cá nhân hóa
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1 font-semibold">
+                            Dựa trên điểm trung bình thực tế từ các buổi phỏng vấn của bạn
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {(() => {
+                          const avgContent = totalCompleted ? (avgScores.content / totalCompleted) : 0;
+                          const avgRelevance = totalCompleted ? (avgScores.relevance / totalCompleted) : 0;
+                          const avgCompleteness = totalCompleted ? (avgScores.completeness / totalCompleted) : 0;
+                          const avgPresentation = totalCompleted ? (avgScores.presentation / totalCompleted) : 0;
+
+                          const paths = [];
+
+                          if (avgContent < 8.0) {
+                            paths.push({
+                              title: "Củng cố kiến thức chuyên môn",
+                              score: avgContent,
+                              color: "text-blue-600",
+                              bgColor: "bg-blue-50 border-blue-100",
+                              iconColor: "bg-blue-100",
+                              desc: "Điểm nội dung trả lời còn hạn chế. Hãy tập trung củng cố kiến thức nền tảng và cập nhật các dự án kỹ thuật.",
+                              steps: [
+                                "Hệ thống hóa các công nghệ cốt lõi ghi trên CV của bạn.",
+                                "Chuẩn bị các câu hỏi lý thuyết chuyên sâu về lập trình/system design.",
+                                "Xem lại phản hồi chi tiết về các lỗi logic trong câu trả lời cũ."
+                              ]
+                            });
+                          }
+
+                          if (avgRelevance < 8.0) {
+                            paths.push({
+                              title: "Tối ưu hóa độ bám sát câu hỏi",
+                              score: avgRelevance,
+                              color: "text-emerald-600",
+                              bgColor: "bg-emerald-50 border-emerald-100",
+                              iconColor: "bg-emerald-100",
+                              desc: "Bạn có xu hướng giải thích dài dòng hoặc chưa đi trực tiếp vào vấn đề chính nhà tuyển dụng yêu cầu.",
+                              steps: [
+                                "Đọc kỹ từ khóa cốt lõi trong câu hỏi trước khi trả lời.",
+                                "Cấu trúc ý trả lời rõ ràng thành 2 - 3 luận điểm chính.",
+                                "Tránh đưa các chi tiết không liên quan từ kinh nghiệm ngoài lề."
+                              ]
+                            });
+                          }
+
+                          if (avgCompleteness < 8.0) {
+                            paths.push({
+                              title: "Làm chủ phương pháp trả lời STAR",
+                              score: avgCompleteness,
+                              color: "text-amber-600",
+                              bgColor: "bg-amber-50 border-amber-100",
+                              iconColor: "bg-amber-100",
+                              desc: "Các câu hỏi tình huống hành vi của bạn thường bị thiếu kết quả cụ thể hoặc mô tả chưa rõ hành động cá nhân.",
+                              steps: [
+                                "Bắt đầu bằng mô tả Tình huống (S) và Nhiệm vụ (T) ngắn gọn.",
+                                "Làm nổi bật Hành động (A) cá nhân: 'Tôi đã làm...', tránh dùng 'Chúng tôi'.",
+                                "Đưa ra Kết quả (R) đo lường được bằng số liệu cụ thể (ví dụ: tăng 20% performance)."
+                              ]
+                            });
+                          }
+
+                          if (avgPresentation < 8.0) {
+                            paths.push({
+                              title: "Nâng cao kỹ năng thuyết trình & Trình bày",
+                              score: avgPresentation,
+                              color: "text-violet-600",
+                              bgColor: "bg-violet-50 border-violet-100",
+                              iconColor: "bg-violet-100",
+                              desc: "Tốc độ nói, sự lưu loát hoặc tông giọng của bạn cần được cải thiện để tăng phần tự tin, chuyên nghiệp.",
+                              steps: [
+                                "Kiểm soát tốc độ nói vừa phải (khoảng 120-140 từ/phút).",
+                                "Hạn chế tối đa các từ thừa (ờ, à, thì, là, kiểu như, you know).",
+                                "Luyện tập ngắt nghỉ câu rõ ràng và giữ hơi thở đều đặn."
+                              ]
+                            });
+                          }
+
+                          if (paths.length === 0) {
+                            return (
+                              <div className="col-span-2 text-center py-8 bg-emerald-50/50 rounded-2xl border border-emerald-100/50">
+                                <CheckCircleIcon className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                                <h5 className="font-bold text-emerald-800 text-sm">Tuyệt vời! Điểm số của bạn đều trên 8.0</h5>
+                                <p className="text-xs text-emerald-600 max-w-md mx-auto mt-1 font-semibold">
+                                  Bạn đang có phong độ phỏng vấn rất tốt ở tất cả các khía cạnh. Hãy tiếp tục duy trì luyện tập để làm quen với nhiều câu hỏi áp lực hơn!
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return paths.map((path, idx) => (
+                            <div key={idx} className={`rounded-2xl border p-5 flex flex-col justify-between ${path.bgColor}`}>
+                              <div>
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                  <h5 className={`font-black text-sm ${path.color}`}>{path.title}</h5>
+                                  <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${path.iconColor} ${path.color}`}>
+                                    Trung bình: {path.score.toFixed(1)}/10
+                                  </span>
+                                </div>
+                                <p className="text-slate-600 text-xs font-semibold leading-relaxed mb-4">
+                                  {path.desc}
+                                </p>
+                                <div className="space-y-2.5">
+                                  {path.steps.map((step, sIdx) => (
+                                    <div key={sIdx} className="flex items-start gap-2.5">
+                                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-bold text-slate-500 border border-slate-200">
+                                        {sIdx + 1}
+                                      </span>
+                                      <span className="text-slate-700 text-xs font-medium pt-0.5 leading-relaxed">
+                                        {step}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </>

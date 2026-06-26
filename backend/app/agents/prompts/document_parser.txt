@@ -11,7 +11,14 @@ Tra ve JSON voi cau truc:
   "jd_gap_analysis": {{
     "matched_skills": ["..."],
     "missing_keywords": ["..."],
-    "weak_areas": ["..."]
+    "weak_areas": ["..."],
+    "personal_info": {{
+      "full_name": "Name of candidate",
+      "email": "Email of candidate",
+      "phone": "Phone number",
+      "address": "Address or location",
+      "summary": "Objective or brief summary of candidate"
+    }}
   }}
 }}
 

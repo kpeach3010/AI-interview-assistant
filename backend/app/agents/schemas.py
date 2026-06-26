@@ -58,10 +58,20 @@ class EducationItem(BaseModel):
     period: str = ""
 
 
+class PersonalInfo(BaseModel):
+    full_name: str = ""
+    email: str = ""
+    phone: str = ""
+    address: str = ""
+    summary: str = ""
+    theme_color: str = "emerald"
+
+
 class JdGapAnalysis(BaseModel):
     matched_skills: list[str] = Field(default_factory=list)
     missing_keywords: list[str] = Field(default_factory=list)
     weak_areas: list[str] = Field(default_factory=list)
+    personal_info: PersonalInfo = Field(default_factory=PersonalInfo)
 
     _v_matched = field_validator("matched_skills", mode="before")(_to_str_list)
     _v_missing = field_validator("missing_keywords", mode="before")(_to_str_list)

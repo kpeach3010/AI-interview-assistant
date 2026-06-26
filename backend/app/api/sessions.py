@@ -2,8 +2,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 
+from app.services.pdf_resume import generate_resume_pdf
 from app.agents.pipeline import run_document_pipeline, run_evaluation_pipeline
 from app.api.schemas import CreateSessionRequest, QuestionResponse, SessionResponse
 from app.core.auth import get_current_user
@@ -184,3 +185,63 @@ async def get_messages(session_id: str, user: Annotated[dict, Depends(get_curren
         }
         for m in messages
     ]
+
+
+@router.get("/{session_id}/candidate-profile")
+async def get_candidate_profile(session_id: str, user: Annotated[dict, Depends(get_current_user)]):
+    session = db.get_session(session_id, user["sub"])
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    profile = db.get_candidate_profile(session_id)
+    if not profile:
+        return {
+            "skills": [],
+            "experiences": [],
+            "projects": [],
+            "education": [],
+            "achievements": [],
+            "jd_gap_analysis": {}
+        }
+    return profile
+
+
+@router.put("/{session_id}/candidate-profile")
+async def update_candidate_profile(
+    session_id: str,
+    body: dict,
+    user: Annotated[dict, Depends(get_current_user)]
+):
+    session = db.get_session(session_id, user["sub"])
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    update_data = {
+        "skills": body.get("skills", []),
+        "experiences": body.get("experiences", []),
+        "projects": body.get("projects", []),
+        "education": body.get("education", []),
+        "achievements": body.get("achievements", []),
+        "jd_gap_analysis": body.get("jd_gap_analysis", {})
+    }
+    
+    profile = db.upsert_candidate_profile(session_id, update_data)
+    return profile
+
+
+@router.get("/{session_id}/cv/pdf")
+async def get_cv_pdf(session_id: str, user: Annotated[dict, Depends(get_current_user)]):
+    session = db.get_session(session_id, user["sub"])
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    profile = db.get_candidate_profile(session_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Candidate profile not found")
+        
+    pdf_bytes = generate_resume_pdf(session.get("position_applied") or "Chuyên viên", profile)
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="optimized-cv-{session_id}.pdf"'},
+    )
