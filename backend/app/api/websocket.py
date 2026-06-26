@@ -157,6 +157,64 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                     "message_type": msg_type_out,
                 })
 
+            elif msg_type == "transcribe_audio":
+                audio_b64 = data.get("audio_base64", "")
+                transcript = transcribe_audio_base64(audio_b64, language)
+
+                # Tải file âm thanh lên Supabase để lưu giữ làm bằng chứng ghi âm
+                audio_bytes = base64.b64decode(audio_b64)
+                msg_id = storage_service.new_doc_id()
+                audio_path = f"{session_id}/{msg_id}.webm"
+                try:
+                    storage_service.upload_file("audio-recordings", audio_path, audio_bytes, "audio/webm")
+                except Exception as exc:
+                    logger.warning("Audio upload failed during transcribe: %s", exc)
+                    audio_path = None
+
+                await websocket.send_json({
+                    "type": "transcription_result",
+                    "text": transcript,
+                    "audio_path": audio_path,
+                })
+
+            elif msg_type == "submit_answer":
+                text = data.get("text", "")
+                question_id = data.get("question_id")
+                audio_path = data.get("audio_path")
+
+                # Lưu tin nhắn câu trả lời chính thức của ứng viên
+                _save_message(session_id, "candidate", "answer", text, question_id, audio_path)
+                await websocket.send_json({"type": "transcript", "text": text, "final": True})
+
+                action = await decide_next_action(session_id, text, language)
+
+                if action["action"] == "complete":
+                    complete_msg = action.get("message", "Phong van ket thuc.")
+                    _save_message(session_id, "interviewer", "system", complete_msg)
+                    complete_audio = await synthesize_speech(complete_msg, language)
+                    await websocket.send_json({
+                        "type": "interview_complete",
+                        "text": complete_msg,
+                        "audio_base64": base64.b64encode(complete_audio).decode() if complete_audio else None,
+                    })
+                    break
+
+                response_text = action["text"]
+                msg_type_out = "follow_up" if action["action"] == "follow_up" else "question"
+                _save_message(
+                    session_id, "interviewer", msg_type_out, response_text, action.get("question_id")
+                )
+                resp_audio = await synthesize_speech(response_text, language)
+                await websocket.send_json({
+                    "type": "interviewer_speech",
+                    "text": response_text,
+                    "audio_base64": base64.b64encode(resp_audio).decode() if resp_audio else None,
+                    "question_id": action.get("question_id"),
+                    "question_index": action.get("question_index"),
+                    "total_questions": action.get("total_questions"),
+                    "message_type": msg_type_out,
+                })
+
             elif msg_type == "end_interview":
                 end_msg = "Cam on ban. Buoi phong van da ket thuc." if language == "vi" else "Thank you. The interview has ended."
                 _save_message(session_id, "interviewer", "system", end_msg)
