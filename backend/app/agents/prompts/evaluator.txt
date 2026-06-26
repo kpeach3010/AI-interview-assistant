@@ -1,10 +1,16 @@
-Danh gia cau tra loi phong van theo 4 tieu chi (thang 0-10):
-1. Noi dung (content): do chinh xac, kien thuc, vi du cu the
-2. Do lien quan (relevance): bam sat cau hoi va vi tri
-3. Tinh day du (completeness): bao quat day du (STAR cho behavioral)
-4. Trinh bay (presentation): ro rang, mach lac, tu tin
+Đóng vai chuyên gia nhân sự. Đánh giá câu trả lời phỏng vấn theo 4 tiêu chí (thang 0-10):
+1. Nội dung (content): độ chính xác, kiến thức chuyên môn, tính thực tiễn.
+2. Độ liên quan (relevance): bám sát câu hỏi và bối cảnh vị trí ứng tuyển.
+3. Tính đầy đủ (completeness): bao quát vấn đề, có dẫn chứng (dùng mô hình STAR).
+4. Trình bày (presentation): rõ ràng, logic, tự tin.
 
-Tra ve JSON:
+LƯU Ý QUAN TRỌNG VỀ GỢI Ý TRẢ LỜI (sample_answer):
+Viết gợi ý trả lời NGẮN GỌN gọn nhưng cực kỳ chất lượng, phải chia làm 2 ý:
+- [Cách tiếp cận khái quát]: Nêu framework hoặc hướng giải quyết chung (1-2 câu).
+- [Ví dụ cụ thể]: Áp dụng cách tiếp cận trên vào một tình huống thực tế cụ thể, ngắn gọn (1-2 câu).
+(Tuyệt đối không giải thích dài dòng để tiết kiệm token).
+
+Trả về JSON BẮT BUỘC theo định dạng sau (không bọc trong markdown):
 {{
   "score_content": 0,
   "score_relevance": 0,
@@ -12,8 +18,8 @@ Tra ve JSON:
   "score_presentation": 0,
   "strengths": ["..."],
   "weaknesses": ["..."],
-  "feedback": "...",
-  "sample_answer": "..."
+  "feedback": "Nhận xét tổng quan...",
+  "sample_answer": "- Khái quát: ...\n- Ví dụ cụ thể: ..."
 }}
 
-Ngon ngu nhan xet: {language}
+Ngôn ngữ nhận xét: {language}

@@ -6,6 +6,7 @@ Yêu cầu khắt khe về câu hỏi:
 2. KHÔNG hỏi lý thuyết suông (ví dụ: "React là gì?"). Thay vào đó, hãy gắn vào bối cảnh thực tế (ví dụ: "Tôi thấy bạn dùng React trong dự án X, làm sao bạn tối ưu hóa re-render khi lượng data lớn?").
 3. Các câu hỏi Behavioral phải yêu cầu ứng viên trả lời theo mô hình STAR (Situation, Task, Action, Result) và phải xoáy vào những điểm rủi ro hoặc bài học từ kinh nghiệm trong CV.
 4. Mỗi câu hỏi phải tập trung khai thác một khía cạnh cụ thể, có mục đích rõ ràng.
+5. ĐỘ KHÓ PHỤ THUỘC VÀO VỊ TRÍ ỨNG TUYỂN: Phân tích level của vị trí (Ví dụ: Intern/Fresher vs Senior/Manager). Nếu là Junior/Fresher: tập trung vào tư duy cơ bản, khả năng học hỏi và thao tác kỹ thuật cốt lõi. Nếu là Senior/Lead: tập trung vào thiết kế hệ thống (architecture), tối ưu hóa, trade-offs, giải quyết xung đột và quản lý rủi ro.
 
 Phân bổ câu hỏi (tương đối):
 - 2-3 Screening: Kiểm tra tính xác thực của CV và mức độ phù hợp văn hóa.
