@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from app.api.schemas import DocumentUploadResponse
+from app.api.schemas import DocumentResponse, DocumentUploadResponse
 from app.core.auth import get_current_user
 from app.core.database import db
 from app.services.supabase_storage import storage_service
@@ -17,6 +17,34 @@ MIME_MAP = {
     ".txt": "text/plain",
 }
 
+
+@router.get("", response_model=list[DocumentResponse])
+async def get_documents(
+    user: Annotated[dict, Depends(get_current_user)],
+    doc_type: str | None = None,
+):
+    user_id = user["sub"]
+    docs = db.get_documents_by_user(user_id, doc_type)
+    return docs
+
+
+@router.get("/{doc_id}/url")
+async def get_document_url(
+    user: Annotated[dict, Depends(get_current_user)],
+    doc_id: str,
+):
+    user_id = user["sub"]
+    doc = db.get_document(doc_id, user_id=user_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    bucket = doc.get("storage_bucket")
+    path = doc.get("storage_path")
+    if not bucket or not path:
+        raise HTTPException(status_code=400, detail="Document storage info missing")
+        
+    url = storage_service.get_signed_url(bucket, path, expires_in=3600)
+    return {"url": url}
 
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
@@ -60,3 +88,4 @@ async def upload_document(
         file_name=doc["file_name"],
         storage_path=doc["storage_path"],
     )
+

@@ -57,6 +57,14 @@ class DatabaseService:
         result = q.execute()
         return result.data[0] if result.data else None
 
+    def get_documents_by_user(self, user_id: str, doc_type: str | None = None) -> list[dict]:
+        q = self._table("documents").select("id, file_name, created_at, type").eq("user_id", user_id)
+        if doc_type:
+            q = q.eq("type", doc_type)
+        q = q.order("created_at", desc=True)
+        result = q.execute()
+        return result.data
+
     def update_document(self, doc_id: str, data: dict) -> dict:
         return self._table("documents").update(data).eq("id", doc_id).execute().data[0]
 

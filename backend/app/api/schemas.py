@@ -8,6 +8,13 @@ class DocumentUploadResponse(BaseModel):
     storage_path: str
 
 
+class DocumentResponse(BaseModel):
+    id: str
+    file_name: str
+    type: str
+    created_at: str | None = None
+
+
 class CreateSessionRequest(BaseModel):
     cv_document_id: str
     jd_document_id: str | None = None

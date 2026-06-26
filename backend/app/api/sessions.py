@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -7,6 +8,8 @@ from app.agents.pipeline import run_document_pipeline, run_evaluation_pipeline
 from app.api.schemas import CreateSessionRequest, QuestionResponse, SessionResponse
 from app.core.auth import get_current_user
 from app.core.database import db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -87,9 +90,15 @@ async def create_session(
     # Frontend chi can goi 1 lan, khong polling.
     try:
         await run_document_pipeline(session["id"])
-    except Exception:
-        # Pipeline da tu cap nhat status=failed + error_message
-        pass
+    except Exception as exc:
+        # Pipeline da tu cap nhat status=failed + error_message trong DB.
+        # Log ra day de de debug, khong raise lai tranh 500 cho client.
+        logger.error(
+            "Pipeline failed for session %s: %s",
+            session["id"],
+            exc,
+            exc_info=True,
+        )
 
     updated = db.get_session(session["id"], user["sub"]) or session
     return _session_to_response(updated)
