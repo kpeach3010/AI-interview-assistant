@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -6,8 +7,15 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Số câu được chấm song song cùng lúc (tôn trọng rate-limit Groq free tier:
+# 6000 TPM. Quá cao sẽ gây 429 hàng loạt).
+_EVAL_CONCURRENCY = 2
+# Đánh giá một câu cần ít token đầu ra -> giảm để nhanh hơn.
+_EVAL_MAX_TOKENS = 700
+
 from app.agents.schemas import AnswerEvaluationData, CvSuggestion, ReportSummary
 from app.agents.cv_reviewer_agent import review_cv
+from app.core.config import get_settings
 from app.core.database import db
 from app.core.llm_router import llm_router
 from app.services.pdf_report import generate_report_pdf
@@ -79,7 +87,10 @@ async def evaluate_session(session_id: str) -> dict[str, Any]:
     evaluations = []
     total_scores = {"content": 0.0, "relevance": 0.0, "completeness": 0.0, "presentation": 0.0}
 
-    for question in all_questions:
+    semaphore = asyncio.Semaphore(_EVAL_CONCURRENCY)
+
+    async def _grade_one(question: dict[str, Any]) -> AnswerEvaluationData:
+        """Chấm 1 câu (chỉ phần gọi LLM) — chạy song song có giới hạn."""
         answer = answers_by_question.get(question["id"], "").strip()
         if not answer:
             answer = "(Ứng viên không trả lời câu hỏi này)"
@@ -92,20 +103,29 @@ Expected grading criteria: {grading_criteria}
 Candidate answer: {answer}
 Target position: {session['position_applied']}
 """
-        try:
-            data, _ = await llm_router.generate_json(prompt, system)
-            ev = AnswerEvaluationData.model_validate(data)
-        except Exception:
-            ev = AnswerEvaluationData(
-                score_content=0.0,
-                score_relevance=0.0,
-                score_completeness=0.0,
-                score_presentation=0.0,
-                strengths=[],
-                weaknesses=["Khong danh gia duoc cau tra loi"],
-                feedback="He thong khong tao duoc danh gia cho cau nay.",
-                sample_answer="N/A",
-            )
+        async with semaphore:
+            try:
+                data, _ = await llm_router.generate_json(prompt, system, max_tokens=_EVAL_MAX_TOKENS)
+                return AnswerEvaluationData.model_validate(data)
+            except Exception:
+                return AnswerEvaluationData(
+                    score_content=0.0,
+                    score_relevance=0.0,
+                    score_completeness=0.0,
+                    score_presentation=0.0,
+                    strengths=[],
+                    weaknesses=["Khong danh gia duoc cau tra loi"],
+                    feedback="He thong khong tao duoc danh gia cho cau nay.",
+                    sample_answer="N/A",
+                )
+
+    # Gọi LLM song song cho tất cả câu (giữ nguyên thứ tự kết quả).
+    ev_results: list[AnswerEvaluationData] = await asyncio.gather(
+        *(_grade_one(q) for q in all_questions)
+    )
+
+    # Ghi DB + cộng dồn điểm tuần tự (theo đúng thứ tự câu hỏi).
+    for question, ev in zip(all_questions, ev_results):
         overall = _weighted_overall(
             {
                 "content": ev.score_content,
@@ -177,7 +197,9 @@ Criterion average scores: {json.dumps(averages)}
     summarizer_system_template = _load_prompt("summarizer.txt")
     summarizer_system = summarizer_system_template.format(language=session.get("language", "vi"))
     try:
-        summary_data, _ = await llm_router.generate_json(summary_prompt, summarizer_system)
+        summary_data, _ = await llm_router.generate_json(
+            summary_prompt, summarizer_system, max_tokens=1200, model=get_settings().groq_quality_model
+        )
     except Exception:
         summary_data = {}
 
@@ -228,8 +250,23 @@ Criterion average scores: {json.dumps(averages)}
                 priority="high"
             )
         )
-        
-    # 3. Add other detailed suggestions
+
+    # 2b. Từ khoá JD còn thiếu (ATS gap)
+    ats_missing = cv_review.get("ats_keywords_missing", [])
+    if ats_missing:
+        kw_text = ", ".join(str(k) for k in ats_missing)
+        suggestions.append(
+            CvSuggestion(
+                section="Từ khoá JD còn thiếu (ATS)",
+                suggestion=(
+                    "Các từ khoá/kỹ năng JD yêu cầu nhưng CV chưa thể hiện rõ. "
+                    f"Bổ sung nếu bạn thực sự có: {kw_text}"
+                ),
+                priority="high",
+            )
+        )
+
+    # 3. Add other detailed suggestions (kèm bằng chứng + Before/After thật từ LLM)
     for item in cv_review.get("cv_suggestions", []):
         if isinstance(item, dict) and item.get("suggestion"):
             suggestions.append(
@@ -237,6 +274,9 @@ Criterion average scores: {json.dumps(averages)}
                     section=str(item.get("section", "Chung")),
                     suggestion=str(item["suggestion"]),
                     priority=str(item.get("priority", "medium")),
+                    evidence=item.get("evidence"),
+                    before=item.get("before"),
+                    after=item.get("after"),
                 )
             )
 

@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import logging
 
@@ -39,3 +40,9 @@ def transcribe_audio_base64(audio_b64: str, language: str) -> str:
     
 def transcribe_audio_bytes(audio_bytes: bytes, language: str = "vi") -> str:
     return transcribe_audio_base64(base64.b64encode(audio_bytes).decode(), language)
+
+
+async def transcribe_audio_base64_async(audio_b64: str, language: str) -> str:
+    """Async wrapper: chạy Groq STT (blocking) trong thread riêng để KHÔNG chặn
+    event loop. Nhờ vậy nhiều phiên phỏng vấn đồng thời không làm 'đơ' lẫn nhau."""
+    return await asyncio.to_thread(transcribe_audio_base64, audio_b64, language)

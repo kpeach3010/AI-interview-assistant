@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.agents.schemas import CvSuggestion
+from app.core.config import get_settings
 from app.core.llm_router import llm_router
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,8 @@ class CvReviewResult(BaseModel):
     general_critique: str
     spelling_grammar_issues: list[str] = Field(default_factory=list)
     cv_suggestions: list[CvSuggestion] = Field(default_factory=list)
+    # Từ khoá quan trọng trong JD nhưng chưa xuất hiện trong CV (ATS gap).
+    ats_keywords_missing: list[str] = Field(default_factory=list)
 
 
 def _load_prompt(name: str) -> str:
@@ -60,8 +63,11 @@ Target Position: {position}
 Industry: {industry or "Not specified"}
 """
 
+    settings = get_settings()
     try:
-        data, _ = await llm_router.generate_json(user_prompt, system)
+        data, _ = await llm_router.generate_json(
+            user_prompt, system, max_tokens=2200, model=settings.groq_quality_model
+        )
         result = CvReviewResult.model_validate(data)
         return result.model_dump()
     except Exception as exc:

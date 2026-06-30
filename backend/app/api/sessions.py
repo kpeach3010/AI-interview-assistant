@@ -267,7 +267,7 @@ async def get_cv_pdf(session_id: str, user: Annotated[dict, Depends(get_current_
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found")
         
-    pdf_bytes = generate_resume_pdf(session.get("position_applied") or "Chuyên viên", profile)
+    pdf_bytes = await generate_resume_pdf(session.get("position_applied") or "Chuyên viên", profile)
     
     return Response(
         content=pdf_bytes,

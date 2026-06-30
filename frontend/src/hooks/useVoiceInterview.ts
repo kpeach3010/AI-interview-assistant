@@ -42,6 +42,22 @@ export function useVoiceInterview({ sessionId, token, voice, onComplete }: UseVo
   const [autoReadAloud, setAutoReadAloud] = useState(true);
   const autoReadAloudRef = useRef(true);
 
+  // Hàng đợi phát audio streaming (mỗi câu là 1 blob MP3 độc lập).
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingRef = useRef(false);
+  const lastChunksRef = useRef<string[]>([]);
+
+  // Đẩy 1 blob audio vào hàng đợi; nếu chưa phát gì thì phát ngay.
+  const enqueueAudio = useCallback((b64: string) => {
+    if (!isPlayingRef.current) {
+      isPlayingRef.current = true;
+      setIsAiSpeaking(true);
+      setCurrentAudio(b64);
+    } else {
+      audioQueueRef.current.push(b64);
+    }
+  }, []);
+
   useEffect(() => {
     autoReadAloudRef.current = autoReadAloud;
   }, [autoReadAloud]);
@@ -74,6 +90,7 @@ export function useVoiceInterview({ sessionId, token, voice, onComplete }: UseVo
       }
 
       if (data.type === "interviewer_speech") {
+        setIsInitialized(true);
         setMessages((prev) => [
           ...prev,
           { role: "interviewer", content: data.text, message_type: data.message_type },
@@ -95,6 +112,42 @@ export function useVoiceInterview({ sessionId, token, voice, onComplete }: UseVo
         setTranscriptionResult(null);
         setAudioPath(null);
         setIsTranscribing(false);
+      }
+
+      // Giao thức STREAMING: text hiện ngay (seq 0), audio phát dần theo câu.
+      if (data.type === "interviewer_speech_chunk") {
+        if (data.seq === 0 && data.text != null) {
+          // Phiên mới: nhận câu mở đầu qua đây (không có message "history")
+          // -> phải đánh dấu đã khởi tạo để thoát màn hình loading.
+          setIsInitialized(true);
+          // 1) Hiện TEXT tức thì, không chờ audio
+          setMessages((prev) => [
+            ...prev,
+            { role: "interviewer", content: data.text, message_type: data.message_type },
+          ]);
+          if (data.question_id) setCurrentQuestionId(data.question_id);
+          if (data.question_index != null) setQuestionIndex(data.question_index);
+          if (data.total_questions) setTotalQuestions(data.total_questions);
+          setTranscriptionResult(null);
+          setAudioPath(null);
+          setIsTranscribing(false);
+          // Reset bộ tích luỹ audio cho lượt mới
+          audioQueueRef.current = [];
+          lastChunksRef.current = [];
+          return;
+        }
+        // 2) Audio từng câu -> tích luỹ + phát dần
+        if (data.audio_base64) {
+          lastChunksRef.current.push(data.audio_base64);
+          if (autoReadAloudRef.current) {
+            enqueueAudio(data.audio_base64);
+          }
+        }
+        // 3) Kết thúc luồng: lưu blob đầu để nút "nghe lại"
+        if (data.done) {
+          setLastQuestionAudio(lastChunksRef.current[0] ?? null);
+        }
+        return;
       }
 
       if (data.type === "transcription_result") {
@@ -184,11 +237,28 @@ export function useVoiceInterview({ sessionId, token, voice, onComplete }: UseVo
   }, []);
 
   const onAudioEnded = useCallback(() => {
-    setIsAiSpeaking(false);
-    setCurrentAudio(null);
+    // Còn blob trong hàng đợi -> phát tiếp; hết -> dừng nói.
+    const next = audioQueueRef.current.shift();
+    if (next) {
+      setCurrentAudio(next);
+    } else {
+      isPlayingRef.current = false;
+      setIsAiSpeaking(false);
+      setCurrentAudio(null);
+    }
   }, []);
 
   const replayAudio = useCallback(() => {
+    // Phát lại toàn bộ các câu của lượt AI gần nhất.
+    const chunks = lastChunksRef.current;
+    if (chunks.length > 0) {
+      audioQueueRef.current = chunks.slice(1);
+      isPlayingRef.current = true;
+      setIsAiSpeaking(true);
+      setCurrentAudio(null);
+      setTimeout(() => setCurrentAudio(chunks[0]), 50);
+      return;
+    }
     if (lastQuestionAudio) {
       setCurrentAudio(null);
       setTimeout(() => {

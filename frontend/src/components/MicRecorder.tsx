@@ -12,13 +12,42 @@ interface MicRecorderProps {
   onAudioChunk: (base64: string) => void;
   onLiveTranscript?: (text: string) => void;
   disabled?: boolean;
+  /** Tự dừng ghi âm khi phát hiện im lặng (VAD). Mặc định bật. */
+  vadEnabled?: boolean;
+  /** Thời gian im lặng (ms) trước khi tự dừng. */
+  silenceMs?: number;
 }
 
-export default function MicRecorder({ onAudioChunk, onLiveTranscript, disabled }: MicRecorderProps) {
+export default function MicRecorder({
+  onAudioChunk,
+  onLiveTranscript,
+  disabled,
+  vadEnabled = true,
+  silenceMs = 1200,
+}: MicRecorderProps) {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<any>(null);
+
+  // VAD (voice activity detection) refs
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const vadRafRef = useRef<number | null>(null);
+  const hasSpokenRef = useRef(false);
+  const silenceStartRef = useRef<number | null>(null);
+
+  const cleanupVad = useCallback(() => {
+    if (vadRafRef.current != null) {
+      cancelAnimationFrame(vadRafRef.current);
+      vadRafRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+    hasSpokenRef.current = false;
+    silenceStartRef.current = null;
+  }, []);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -75,12 +104,56 @@ export default function MicRecorder({ onAudioChunk, onLiveTranscript, disabled }
       // Record continuously without timeslice, export data on stop
       recorder.start();
       setRecording(true);
-      
+
       if (recognitionRef.current) {
         try {
           recognitionRef.current.start();
         } catch (e) {
           console.error("Lỗi khi bắt đầu nhận diện giọng nói: ", e);
+        }
+      }
+
+      // VAD: tự dừng khi im lặng (sau khi đã có tiếng nói).
+      if (vadEnabled) {
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          const ctx = new AudioCtx();
+          audioCtxRef.current = ctx;
+          const source = ctx.createMediaStreamSource(stream);
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
+          const buf = new Uint8Array(analyser.fftSize);
+          hasSpokenRef.current = false;
+          silenceStartRef.current = null;
+
+          const SPEAK_RMS = 0.025; // ngưỡng coi là "có tiếng nói"
+          const tick = () => {
+            if (mediaRecorderRef.current?.state !== "recording") return;
+            analyser.getByteTimeDomainData(buf);
+            let sum = 0;
+            for (let i = 0; i < buf.length; i++) {
+              const v = (buf[i] - 128) / 128;
+              sum += v * v;
+            }
+            const rms = Math.sqrt(sum / buf.length);
+            const now = performance.now();
+            if (rms > SPEAK_RMS) {
+              hasSpokenRef.current = true;
+              silenceStartRef.current = null;
+            } else if (hasSpokenRef.current) {
+              if (silenceStartRef.current == null) {
+                silenceStartRef.current = now;
+              } else if (now - silenceStartRef.current >= silenceMs) {
+                stopRecording();
+                return;
+              }
+            }
+            vadRafRef.current = requestAnimationFrame(tick);
+          };
+          vadRafRef.current = requestAnimationFrame(tick);
+        } catch (e) {
+          console.error("VAD init failed:", e);
         }
       }
     } catch {
@@ -89,6 +162,7 @@ export default function MicRecorder({ onAudioChunk, onLiveTranscript, disabled }
   };
 
   const stopRecording = () => {
+    cleanupVad();
     if (mediaRecorderRef.current?.state === "recording") {
       // stop() triggers ondataavailable then onstop to send blob
       mediaRecorderRef.current.stop();
@@ -103,6 +177,9 @@ export default function MicRecorder({ onAudioChunk, onLiveTranscript, disabled }
     }
     setRecording(false);
   };
+
+  // Dọn dẹp VAD khi unmount
+  useEffect(() => cleanupVad, [cleanupVad]);
 
   return (
     <div className="flex flex-col items-center gap-3">

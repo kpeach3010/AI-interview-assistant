@@ -38,9 +38,26 @@ export default function InterviewPage() {
   const [isLoadingHint, setIsLoadingHint] = useState(false);
   const [showHint, setShowHint] = useState(false);
 
+  // UX độ trễ thấp: tự dừng khi im lặng (VAD) + gửi thẳng không cần xem lại.
+  const [vadEnabled, setVadEnabled] = useState(
+    () => localStorage.getItem("ai_vad") !== "0"
+  );
+  const [reviewBeforeSend, setReviewBeforeSend] = useState(
+    () => localStorage.getItem("ai_review") === "1"
+  );
+  const [isSending, setIsSending] = useState(false);
+
   useEffect(() => {
     localStorage.setItem("ai_voice", voice);
   }, [voice]);
+
+  useEffect(() => {
+    localStorage.setItem("ai_vad", vadEnabled ? "1" : "0");
+  }, [vadEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem("ai_review", reviewBeforeSend ? "1" : "0");
+  }, [reviewBeforeSend]);
 
   const handleComplete = useCallback(async () => {
     if (!sessionId || !accessToken) return;
@@ -68,6 +85,7 @@ export default function InterviewPage() {
     transcriptionResult,
     audioPath,
     isTranscribing,
+    sendAudioChunk,
     transcribeAudio,
     submitAnswer,
     replayAudio,
@@ -161,22 +179,33 @@ export default function InterviewPage() {
     }
   }, [currentQuestionId, isComplete, startQuestion, sessionId, accessToken]);
 
-  // Auto-submit voice transcription result without review
+  // Chế độ XEM LẠI: khi có transcript thì đổ vào ô soạn để người dùng sửa rồi
+  // tự bấm gửi (luồng 2 bước). Chế độ mặc định (1 bước) không đi qua đây.
   useEffect(() => {
     if (transcriptionResult !== null) {
-      const time = pauseQuestion();
-      if (time) {
-        submitQuestionTiming(sessionId!, time.questionId, time.durationMs, accessToken!).catch(console.error);
-        const sessionTime = completeSession();
-        if (sessionTime) {
-          submitSessionTiming(sessionId!, sessionTime.durationMs, accessToken!).catch(console.error);
-        }
-      }
-      submitAnswer(transcriptionResult, audioPath);
-      resetInputs();
+      setEditedVoiceText(transcriptionResult);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcriptionResult]);
+
+  // Gửi mốc thời gian khi chốt một câu trả lời (dùng chung cho mọi luồng gửi).
+  const submitTimings = useCallback(() => {
+    const time = pauseQuestion();
+    if (time) {
+      submitQuestionTiming(sessionId!, time.questionId, time.durationMs, accessToken!).catch(console.error);
+      const sessionTime = completeSession();
+      if (sessionTime) {
+        submitSessionTiming(sessionId!, sessionTime.durationMs, accessToken!).catch(console.error);
+      }
+    }
+  }, [pauseQuestion, completeSession, sessionId, accessToken]);
+
+  // Khi AI bắt đầu xử lý (đã nhận câu trả lời) -> tắt cờ "đang gửi".
+  useEffect(() => {
+    if (messages.length > 0 && messages[messages.length - 1].role === "candidate") {
+      setIsSending(false);
+    }
+  }, [messages]);
 
   // Reset hint state whenever a new question appears
   const lastInterviewerMsgForHint = [...messages]
@@ -208,7 +237,16 @@ export default function InterviewPage() {
   };
 
   const handleAudioRecording = (base64: string) => {
-    transcribeAudio(base64);
+    if (reviewBeforeSend) {
+      // Luồng 2 bước: nhận transcript -> xem lại -> tự bấm gửi.
+      transcribeAudio(base64);
+    } else {
+      // Luồng 1 bước (mặc định): gửi thẳng, server STT + sinh câu kế trong 1 lần.
+      submitTimings();
+      setIsSending(true);
+      sendAudioChunk(base64);
+      setLiveTranscript("");
+    }
   };
 
   const handleVoiceSubmit = () => {
@@ -538,13 +576,35 @@ export default function InterviewPage() {
                 {/* CHẾ ĐỘ GHI ÂM GIỌNG NÓI */}
                 {inputMode === "voice" && (
                   <div className="flex flex-col items-center justify-center">
-                    {transcriptionResult === null && !isTranscribing && (
+                    {transcriptionResult === null && !isTranscribing && !isSending && (
                       <div className="py-6 flex flex-col items-center w-full">
                         <MicRecorder
                           onAudioChunk={handleAudioRecording}
                           onLiveTranscript={setLiveTranscript}
                           disabled={isAiSpeaking || !connected}
+                          vadEnabled={vadEnabled}
                         />
+                        {/* Toggle UX độ trễ thấp */}
+                        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={vadEnabled}
+                              onChange={(e) => setVadEnabled(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded text-violet-600 focus:ring-violet-500 border-slate-300"
+                            />
+                            Tự dừng khi im lặng
+                          </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none hover:text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={reviewBeforeSend}
+                              onChange={(e) => setReviewBeforeSend(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded text-violet-600 focus:ring-violet-500 border-slate-300"
+                            />
+                            Xem lại trước khi gửi
+                          </label>
+                        </div>
                         {liveTranscript && (
                           <div className="mt-6 w-full max-w-lg p-4 bg-slate-50 border border-slate-200 rounded-xl shadow-inner transition-all duration-300">
                             <div className="flex items-center gap-2 mb-2">
@@ -559,10 +619,12 @@ export default function InterviewPage() {
                       </div>
                     )}
 
-                    {isTranscribing && (
+                    {(isTranscribing || isSending) && (
                       <div className="flex flex-col items-center gap-4 py-10">
                         <div className="w-10 h-10 border-4 border-violet-100 border-t-violet-600 rounded-full animate-spin"></div>
-                        <p className="text-sm font-semibold text-slate-500">Đang nhận diện giọng nói...</p>
+                        <p className="text-sm font-semibold text-slate-500">
+                          {isSending ? "Đang gửi câu trả lời..." : "Đang nhận diện giọng nói..."}
+                        </p>
                       </div>
                     )}
 

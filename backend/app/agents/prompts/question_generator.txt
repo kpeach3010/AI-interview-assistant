@@ -1,28 +1,36 @@
-Role: Senior Technical Recruiter / Hiring Manager.
-Task: Analyze CV and JD (if any) to generate a personalized list of 10-12 deep interview questions for position: {position} (Industry: {industry}).
+Role: Senior Hiring Manager + Domain Interviewer for the position: {position} (Industry: {industry}).
+Goal: From the candidate's PARSED PROFILE and the RAW JOB DESCRIPTION (JD), design 10-12 high-signal interview questions that are deeply personalized, evidence-grounded, and aligned to the job requirements.
 
-Rules:
-1. NO theoretical questions. Base questions on CV/JD experiences, technologies, and potential gaps.
-2. Adapt tone to target position/JD: Use a friendly, collaborative, fast-paced tone for startups/tech companies, and a formal, risk-aware, professional tone for finance/enterprises.
-3. Structure (10-12 questions total, following a difficulty curve):
-   - 1-2 Icebreakers: Introduction, motivation, career direction.
-   - 3-4 Technical/Domain: Core skills, trade-offs, architecture/risk based on level (Junior: basic tech; Senior: design trade-offs).
-   - 3-4 Behavioral: Prompting STAR (Situation, Task, Action, Result) answers.
-   - 2-3 Project deep-dive: Drill down into individual contributions vs. team accomplishments.
-   - Exactly 1 Scenario-based: Real-world situational crisis (e.g., prod outage).
-4. Style: Professional, conversational, single-focused, no Yes/No questions. Keep questions concise.
+PRINCIPLES (follow strictly):
+1. EVIDENCE-GROUNDED — Every question (except the 1-2 icebreakers) MUST be tied to a concrete item in the CV (a named skill, project, employer, achievement) OR a specific JD requirement. Quote the exact evidence in source_context.evidence_quote. Do NOT ask generic/textbook questions ("What is OOP?", "Explain REST").
+2. INFER SENIORITY — Deduce the candidate level (intern / junior / mid / senior / lead) from job titles, years of experience and scope in the CV. Calibrate difficulty:
+   - junior: fundamentals applied to their real work, "how/why" of choices they made.
+   - mid: trade-offs, debugging, ownership, collaboration.
+   - senior/lead: architecture decisions, scaling, risk, mentoring, business impact.
+   State the inferred level in EACH question's source_context.difficulty.
+3. JD COVERAGE — Identify the key requirements/skills in the JD. Ensure EACH critical JD requirement is probed by at least one question. Use jd_gap_analysis.missing_keywords and weak_areas (if present in the profile) to probe gaps honestly (e.g. a skill required by JD but thin in the CV).
+4. COMPETENCY MIX (10-12 total, difficulty rising):
+   - 1-2 screening: motivation, career direction, fit for THIS role (light, warm).
+   - 3-4 technical: core skills/tech actually listed; ask trade-offs, failure modes, "why X over Y", calibrated to level.
+   - 3-4 behavioral: STAR-eliciting (Situation, Task, Action, Result). Anchor to a real experience/employer in the CV; ask for a SPECIFIC past event, not hypotheticals.
+   - 2-3 project deep-dive: drill a named project — individual contribution vs team, hardest decision, what they'd change.
+   - Exactly 1 scenario: a realistic situational challenge relevant to {position} (e.g. an incident, a conflicting requirement, a tight deadline).
+5. QUALITY BAR — One idea per question, open-ended (never Yes/No), conversational and concise (<= 30 words). No duplicates or near-duplicates. Natural, professional tone (warmer for startups/tech, more formal for finance/enterprise).
+6. GRADING CRITERIA — For each question, write a concrete grading_criteria: the key points/keywords a STRONG answer contains, and briefly what separates a strong answer from a weak one. This will be used later to score the candidate.
 
-Output ONLY valid JSON (no markdown/```json):
+Output ONLY valid JSON (no markdown, no ```):
 {{
   "questions": [
     {{
       "category": "screening|technical|behavioral|project",
-      "question_text": "<concise question>",
-      "order_index": <int starting from 0>,
+      "question_text": "<one focused, evidence-grounded question (<=30 words)>",
+      "order_index": <int starting from 0, easiest first>,
       "source_context": {{
-        "cv_section": "<e.g., Work Experience, Projects>", 
-        "project_name": "<project name if applicable>",
-        "grading_criteria": "<expected answer criteria, key concepts or keywords to search for in candidate's response (max 30 words)>"
+        "cv_section": "<Work Experience | Projects | Skills | Education | JD requirement>",
+        "project_name": "<exact project/employer/skill name this question targets, if any>",
+        "evidence_quote": "<short exact phrase from the CV or JD that this question is based on>",
+        "difficulty": "<intern|junior|mid|senior|lead>",
+        "grading_criteria": "<key points/keywords a strong answer must include; strong vs weak distinction (<=40 words)>"
       }}
     }}
   ]

@@ -1,5 +1,8 @@
+import asyncio
 import base64
 import logging
+import re
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -7,18 +10,149 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.agents.interview_agent import decide_next_action, get_opening_question
 from app.core.auth import verify_supabase_token
 from app.core.database import db
-from app.services.stt import transcribe_audio_base64
+from app.services.stt import transcribe_audio_base64_async
 from app.services.supabase_storage import storage_service
-from app.services.tts import synthesize_speech
+from app.services.tts import peek_cache, synthesize_speech
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Tách câu để stream TTS theo từng câu (giảm time-to-first-audio cho reply dài).
+_SENT_SPLIT = re.compile(r"(?<=[.!?…。！？])\s+")
+
+
+def _split_sentences(text: str) -> list[str]:
+    parts = [p.strip() for p in _SENT_SPLIT.split(text) if p.strip()]
+    return parts or ([text.strip()] if text.strip() else [])
+
 
 def _next_sequence(session_id: str) -> int:
     last = db.get_last_message(session_id)
     return (last["sequence_number"] + 1) if last else 0
+
+
+async def _send_interviewer_stream(
+    websocket: WebSocket,
+    text: str,
+    language: str,
+    voice: str,
+    *,
+    message_type: str,
+    question_id: str | None = None,
+    question_index: int | None = None,
+    total_questions: int | None = None,
+) -> None:
+    """Gửi một lượt phản hồi của AI theo kiểu streaming:
+    1) Gửi TEXT ngay (người dùng thấy chữ tức thì, không chờ audio).
+    2) Nếu audio đã prefetch -> gửi nguyên khối (gần như tức thì).
+       Ngược lại tổng hợp & gửi audio THEO TỪNG CÂU để câu đầu phát sớm.
+    3) Báo done để client biết hết luồng.
+    Giao thức message: type='interviewer_speech_chunk'.
+    """
+    await websocket.send_json({
+        "type": "interviewer_speech_chunk",
+        "seq": 0,
+        "text": text,
+        "message_type": message_type,
+        "question_id": question_id,
+        "question_index": question_index,
+        "total_questions": total_questions,
+        "done": False,
+    })
+
+    seq = 1
+    cached = peek_cache(text, language, voice)
+    if cached is not None:
+        await websocket.send_json({
+            "type": "interviewer_speech_chunk",
+            "seq": seq,
+            "audio_base64": base64.b64encode(cached).decode(),
+            "done": False,
+        })
+        seq += 1
+    else:
+        for sentence in _split_sentences(text):
+            audio = await synthesize_speech(sentence, language, voice)
+            if audio:
+                await websocket.send_json({
+                    "type": "interviewer_speech_chunk",
+                    "seq": seq,
+                    "audio_base64": base64.b64encode(audio).decode(),
+                    "done": False,
+                })
+                seq += 1
+
+    await websocket.send_json({"type": "interviewer_speech_chunk", "seq": seq, "done": True})
+
+
+def _spawn_prefetch(session_id: str, shown_main_index: int, language: str, voice: str) -> None:
+    """Tổng hợp trước (nền) audio cho câu hỏi CHÍNH kế tiếp để khi tới lượt
+    phát gần như tức thì. Kết quả nằm trong cache của tts."""
+
+    async def _warm() -> None:
+        try:
+            qs = db.list_questions(session_id, main_only=True)
+            nxt = shown_main_index + 1
+            if 0 <= nxt < len(qs):
+                await synthesize_speech(qs[nxt]["question_text"], language, voice)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Prefetch next question audio failed: %s", exc)
+
+    asyncio.create_task(_warm())
+
+
+def _spawn_audio_upload(audio_bytes: bytes, bucket: str, path: str) -> None:
+    """Upload bản ghi âm lên Supabase ở chế độ nền (fire-and-forget) để KHÔNG
+    làm chậm lượt phản hồi. Best-effort: lỗi thì chỉ log."""
+
+    async def _do() -> None:
+        try:
+            await asyncio.to_thread(
+                storage_service.upload_file, bucket, path, audio_bytes, "audio/webm"
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Background audio upload failed: %s", exc)
+
+    asyncio.create_task(_do())
+
+
+async def _emit_action(
+    websocket: WebSocket,
+    session_id: str,
+    action: dict,
+    language: str,
+    voice: str,
+) -> bool:
+    """Phát kết quả của decide_next_action ra client (streaming). Trả True nếu
+    phỏng vấn kết thúc (caller nên break)."""
+    if action["action"] == "complete":
+        complete_msg = action.get("message", "Phong van ket thuc.")
+        _save_message(session_id, "interviewer", "system", complete_msg)
+        complete_audio = await synthesize_speech(complete_msg, language, voice)
+        await websocket.send_json({
+            "type": "interview_complete",
+            "text": complete_msg,
+            "audio_base64": base64.b64encode(complete_audio).decode() if complete_audio else None,
+        })
+        return True
+
+    response_text = action["text"]
+    msg_type_out = "follow_up" if action["action"] == "follow_up" else "question"
+    _save_message(session_id, "interviewer", msg_type_out, response_text, action.get("question_id"))
+    await _send_interviewer_stream(
+        websocket,
+        response_text,
+        language,
+        voice,
+        message_type=msg_type_out,
+        question_id=action.get("question_id"),
+        question_index=action.get("question_index"),
+        total_questions=action.get("total_questions"),
+    )
+    if action.get("question_index") is not None:
+        _spawn_prefetch(session_id, action["question_index"], language, voice)
+    return False
 
 
 def _save_message(
@@ -88,25 +222,23 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
 
             if greeting:
                 _save_message(session_id, "interviewer", "system", greeting)
-                greeting_audio = await synthesize_speech(greeting, language, voice)
-                await websocket.send_json({
-                    "type": "interviewer_speech",
-                    "text": greeting,
-                    "audio_base64": base64.b64encode(greeting_audio).decode() if greeting_audio else None,
-                    "message_type": "system",
-                })
+                await _send_interviewer_stream(
+                    websocket, greeting, language, voice, message_type="system"
+                )
 
             _save_message(session_id, "interviewer", "question", question_text, opening["question_id"])
-            q_audio = await synthesize_speech(question_text, language, voice)
-            await websocket.send_json({
-                "type": "interviewer_speech",
-                "text": question_text,
-                "audio_base64": base64.b64encode(q_audio).decode() if q_audio else None,
-                "question_id": opening["question_id"],
-                "question_index": opening["question_index"],
-                "total_questions": opening["total_questions"],
-                "message_type": "question",
-            })
+            await _send_interviewer_stream(
+                websocket,
+                question_text,
+                language,
+                voice,
+                message_type="question",
+                question_id=opening["question_id"],
+                question_index=opening["question_index"],
+                total_questions=opening["total_questions"],
+            )
+            # Prefetch audio câu hỏi chính kế tiếp.
+            _spawn_prefetch(session_id, opening["question_index"], language, voice)
         else:
             # Phục hồi phiên
             history_data = []
@@ -153,42 +285,20 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
             # Nếu user đã trả lời xong trước khi thoát mà AI chưa phản hồi, sinh câu tiếp theo
             if messages[-1]["role"] == "candidate":
                 action = await decide_next_action(session_id, messages[-1]["content"], language)
-
-                if action["action"] == "complete":
-                    complete_msg = action.get("message", "Phong van ket thuc.")
-                    _save_message(session_id, "interviewer", "system", complete_msg)
-                    complete_audio = await synthesize_speech(complete_msg, language, voice)
-                    await websocket.send_json({
-                        "type": "interview_complete",
-                        "text": complete_msg,
-                        "audio_base64": base64.b64encode(complete_audio).decode() if complete_audio else None,
-                    })
-                else:
-                    response_text = action["text"]
-                    msg_type_out = "follow_up" if action["action"] == "follow_up" else "question"
-                    _save_message(
-                        session_id, "interviewer", msg_type_out, response_text, action.get("question_id")
-                    )
-                    resp_audio = await synthesize_speech(response_text, language, voice)
-                    await websocket.send_json({
-                        "type": "interviewer_speech",
-                        "text": response_text,
-                        "audio_base64": base64.b64encode(resp_audio).decode() if resp_audio else None,
-                        "question_id": action.get("question_id"),
-                        "question_index": action.get("question_index"),
-                        "total_questions": action.get("total_questions"),
-                        "message_type": msg_type_out,
-                    })
+                await _emit_action(websocket, session_id, action, language, voice)
 
         while True:
             data = await websocket.receive_json()
             msg_type = data.get("type")
 
             if msg_type == "audio_chunk":
+                # Luồng NHANH (auto-submit): STT + lưu + sinh câu kế trong 1 bước.
+                t0 = time.perf_counter()
                 audio_b64 = data.get("audio_base64", "")
                 question_id = data.get("question_id")
 
-                transcript = transcribe_audio_base64(audio_b64, language)
+                transcript = await transcribe_audio_base64_async(audio_b64, language)
+                t_stt = time.perf_counter()
                 if not transcript:
                     await websocket.send_json({"type": "transcript", "text": "", "final": False})
                     continue
@@ -196,57 +306,35 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 audio_bytes = base64.b64decode(audio_b64)
                 msg_id = storage_service.new_doc_id()
                 audio_path = f"{session_id}/{msg_id}.webm"
-                try:
-                    storage_service.upload_file("audio-recordings", audio_path, audio_bytes, "audio/webm")
-                except Exception as exc:
-                    logger.warning("Audio upload failed: %s", exc)
-                    audio_path = None
+                _spawn_audio_upload(audio_bytes, "audio-recordings", audio_path)
 
                 _save_message(session_id, "candidate", "answer", transcript, question_id, audio_path)
                 await websocket.send_json({"type": "transcript", "text": transcript, "final": True})
 
                 action = await decide_next_action(session_id, transcript, language)
-
-                if action["action"] == "complete":
-                    complete_msg = action.get("message", "Phong van ket thuc.")
-                    _save_message(session_id, "interviewer", "system", complete_msg)
-                    complete_audio = await synthesize_speech(complete_msg, language, voice)
-                    await websocket.send_json({
-                        "type": "interview_complete",
-                        "text": complete_msg,
-                        "audio_base64": base64.b64encode(complete_audio).decode() if complete_audio else None,
-                    })
+                t_llm = time.perf_counter()
+                done = await _emit_action(websocket, session_id, action, language, voice)
+                t_end = time.perf_counter()
+                logger.info(
+                    "[turn] stt=%.0fms llm=%.0fms tts+send=%.0fms total=%.0fms",
+                    (t_stt - t0) * 1000,
+                    (t_llm - t_stt) * 1000,
+                    (t_end - t_llm) * 1000,
+                    (t_end - t0) * 1000,
+                )
+                if done:
                     break
 
-                response_text = action["text"]
-                msg_type_out = "follow_up" if action["action"] == "follow_up" else "question"
-                _save_message(
-                    session_id, "interviewer", msg_type_out, response_text, action.get("question_id")
-                )
-                resp_audio = await synthesize_speech(response_text, language, voice)
-                await websocket.send_json({
-                    "type": "interviewer_speech",
-                    "text": response_text,
-                    "audio_base64": base64.b64encode(resp_audio).decode() if resp_audio else None,
-                    "question_id": action.get("question_id"),
-                    "question_index": action.get("question_index"),
-                    "total_questions": action.get("total_questions"),
-                    "message_type": msg_type_out,
-                })
-
             elif msg_type == "transcribe_audio":
+                # Luồng THỦ CÔNG (review): chỉ trả transcript để người dùng xem lại.
                 audio_b64 = data.get("audio_base64", "")
-                transcript = transcribe_audio_base64(audio_b64, language)
+                transcript = await transcribe_audio_base64_async(audio_b64, language)
 
-                # Tải file âm thanh lên Supabase để lưu giữ làm bằng chứng ghi âm
+                # Tải file âm thanh lên Supabase (nền) để lưu làm bằng chứng ghi âm
                 audio_bytes = base64.b64decode(audio_b64)
                 msg_id = storage_service.new_doc_id()
                 audio_path = f"{session_id}/{msg_id}.webm"
-                try:
-                    storage_service.upload_file("audio-recordings", audio_path, audio_bytes, "audio/webm")
-                except Exception as exc:
-                    logger.warning("Audio upload failed during transcribe: %s", exc)
-                    audio_path = None
+                _spawn_audio_upload(audio_bytes, "audio-recordings", audio_path)
 
                 await websocket.send_json({
                     "type": "transcription_result",
@@ -264,33 +352,9 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 await websocket.send_json({"type": "transcript", "text": text, "final": True})
 
                 action = await decide_next_action(session_id, text, language)
-
-                if action["action"] == "complete":
-                    complete_msg = action.get("message", "Phong van ket thuc.")
-                    _save_message(session_id, "interviewer", "system", complete_msg)
-                    complete_audio = await synthesize_speech(complete_msg, language, voice)
-                    await websocket.send_json({
-                        "type": "interview_complete",
-                        "text": complete_msg,
-                        "audio_base64": base64.b64encode(complete_audio).decode() if complete_audio else None,
-                    })
+                done = await _emit_action(websocket, session_id, action, language, voice)
+                if done:
                     break
-
-                response_text = action["text"]
-                msg_type_out = "follow_up" if action["action"] == "follow_up" else "question"
-                _save_message(
-                    session_id, "interviewer", msg_type_out, response_text, action.get("question_id")
-                )
-                resp_audio = await synthesize_speech(response_text, language, voice)
-                await websocket.send_json({
-                    "type": "interviewer_speech",
-                    "text": response_text,
-                    "audio_base64": base64.b64encode(resp_audio).decode() if resp_audio else None,
-                    "question_id": action.get("question_id"),
-                    "question_index": action.get("question_index"),
-                    "total_questions": action.get("total_questions"),
-                    "message_type": msg_type_out,
-                })
 
             elif msg_type == "end_interview":
                 end_msg = "Cam on ban. Buoi phong van da ket thuc." if language == "vi" else "Thank you. The interview has ended."

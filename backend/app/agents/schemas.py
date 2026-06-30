@@ -169,6 +169,11 @@ class CvSuggestion(BaseModel):
     section: str
     suggestion: str
     priority: str = "medium"
+    # Bằng chứng trích từ CV và ví dụ viết lại theo công thức XYZ (do LLM tạo,
+    # gắn với CV thật — thay cho ví dụ hard-code ở frontend).
+    evidence: str | None = None
+    before: str | None = None
+    after: str | None = None
 
 
 class ReportSummary(BaseModel):

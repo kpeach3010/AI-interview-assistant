@@ -57,7 +57,7 @@ Trình bày JSON kết quả:
 }}
 Ngôn ngữ: {language}
 """
-        data, _ = await llm_router.generate_json(prompt, "Chỉ trả về JSON hợp lệ.")
+        data, _ = await llm_router.generate_json(prompt, "Chỉ trả về JSON hợp lệ.", max_tokens=256)
         action = data.get("action", "next_question")
         text = data.get("text", "")
 

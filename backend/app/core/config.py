@@ -24,6 +24,9 @@ class Settings(BaseSettings):
 
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"
+    # Model mạnh hơn cho tác vụ nền cần chất lượng cao (sinh câu hỏi, review CV,
+    # parse CV, summarizer). Không dùng cho phần phỏng vấn real-time.
+    groq_quality_model: str = "llama-3.3-70b-versatile"
 
     llm_prefer: str = "auto"  # auto | local | cloud | groq | gemini | ollama
 

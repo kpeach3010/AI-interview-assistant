@@ -137,6 +137,7 @@ async def get_answer_hint(
             prompt,
             system=system_msg,
             prefer="groq",
+            max_tokens=384,
         )
     except Exception as exc:
         logger.error("Hint generation failed for session %s: %s", session_id, exc)

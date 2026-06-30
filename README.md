@@ -53,6 +53,7 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate        # Windows
 pip install -r requirements.txt
+python -m playwright install chromium   # cần cho xuất CV PDF (HTML→PDF); nếu thiếu sẽ tự fallback fpdf2
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -79,6 +80,52 @@ Truy cập: http://localhost:5173
 docker compose up -d
 docker exec -it <ollama_container> ollama pull qwen2.5:7b
 ```
+
+## 6. Chia sẻ web công khai qua Cloudflare Tunnel
+
+Để **bất kỳ ai cũng mở được web qua một đường link** (không cần cùng mạng LAN, không cần cài gì), dùng **Cloudflare Tunnel**. Chỉ cần expose **frontend (port 5173)**: Vite đã được cấu hình **proxy** các request API/WebSocket sang backend `localhost:8000`, nên một link là đủ cho cả giao diện lẫn API.
+
+### Yêu cầu cấu hình (đã thiết lập sẵn trong repo)
+
+- `frontend/.env`: `VITE_API_URL=` **để rỗng** → frontend gọi API/WS bằng đường dẫn tương đối (same-origin).
+- `frontend/vite.config.ts`: bật `allowedHosts: true` và `proxy` cho `/documents`, `/sessions`, `/slides`, `/health`, `/ws` → `http://localhost:8000`.
+
+### Cài cloudflared (nếu chưa có)
+
+```bash
+winget install --id Cloudflare.cloudflared
+# hoặc tải binary tại https://github.com/cloudflare/cloudflared/releases
+```
+
+### Chạy (mở 3 cửa sổ terminal)
+
+```bash
+# 1) Backend
+cd backend
+.venv\Scripts\activate
+uvicorn app.main:app --port 8000
+
+# 2) Frontend
+cd frontend
+npm run dev            # phải chạy ở cổng 5173
+
+# 3) Cloudflare Tunnel (trỏ vào frontend)
+cloudflared tunnel --url http://localhost:5173
+```
+
+Cloudflared sẽ in ra một link dạng:
+
+```
+https://<ngẫu-nhiên>.trycloudflare.com
+```
+
+Gửi link này cho bất kỳ ai — họ mở được toàn bộ web (đăng nhập, upload CV, phỏng vấn voice, báo cáo).
+
+> **Lưu ý:**
+> - Link `trycloudflare.com` là **tunnel tạm thời, đổi mỗi lần chạy** lại lệnh. Muốn link cố định (tên miền riêng) thì cần tài khoản Cloudflare + `cloudflared tunnel login` rồi tạo named tunnel.
+> - Frontend **phải chạy đúng cổng 5173**. Nếu 5173 bị chiếm, Vite nhảy sang 5174/5175… → tunnel sẽ trỏ sai cổng. Tắt các tiến trình cũ trước khi chạy.
+> - Microphone (phỏng vấn voice) cần HTTPS — link `trycloudflare.com` đã là HTTPS nên mic hoạt động bình thường.
+> - Tắt tunnel = đóng terminal cloudflared (Ctrl+C); link ngừng hoạt động ngay.
 
 ## Luồng sử dụng
 

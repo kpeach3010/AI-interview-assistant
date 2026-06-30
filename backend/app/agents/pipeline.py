@@ -80,6 +80,7 @@ async def run_document_pipeline(session_id: str) -> None:
             session["position_applied"],
             session.get("industry"),
             session.get("language", "vi"),
+            jd_text=jd_text,
         )
 
         title_prefix = "Phỏng vấn" if session.get("language") == "vi" else "Interview"

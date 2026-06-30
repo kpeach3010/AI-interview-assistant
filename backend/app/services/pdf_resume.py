@@ -2,10 +2,81 @@ import io
 import logging
 from pathlib import Path
 from typing import Any, Dict
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
 logger = logging.getLogger(__name__)
+
+_TEMPLATES_DIR = Path(__file__).parent / "templates"
+_jinja_env = Environment(
+    loader=FileSystemLoader(str(_TEMPLATES_DIR)),
+    autoescape=select_autoescape(["html", "xml"]),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
+
+# Màu nhấn (hex) cho template HTML — khớp với 5 theme của bản fpdf2.
+THEME_HEX = {
+    "emerald": "#10b981",
+    "blue": "#2563eb",
+    "slate": "#475569",
+    "crimson": "#991b1b",
+    "purple": "#7c3aed",
+}
+
+
+def _skill_to_str(s: Any) -> str:
+    if not isinstance(s, dict):
+        return str(s)
+    name = s.get("name", "")
+    parts = []
+    if s.get("level"):
+        parts.append(str(s["level"]))
+    if s.get("years"):
+        parts.append(f"{s['years']} năm")
+    return f"{name} ({', '.join(parts)})" if parts else name
+
+
+def _build_resume_context(position: str, profile: Dict[str, Any]) -> Dict[str, Any]:
+    jd_gap = profile.get("jd_gap_analysis") or {}
+    info = jd_gap.get("personal_info") or {}
+    theme_name = info.get("theme_color") or "emerald"
+    return {
+        "name": info.get("full_name") or "Ứng viên",
+        "position": position,
+        "email": info.get("email") or "",
+        "phone": info.get("phone") or "",
+        "address": info.get("address") or "",
+        "summary": info.get("summary") or "",
+        "theme": THEME_HEX.get(theme_name, THEME_HEX["emerald"]),
+        "skills": [_skill_to_str(s) for s in (profile.get("skills") or []) if s],
+        "experiences": profile.get("experiences") or [],
+        "projects": profile.get("projects") or [],
+        "education": profile.get("education") or [],
+        "achievements": [a for a in (profile.get("achievements") or []) if a],
+    }
+
+
+def _render_resume_html(position: str, profile: Dict[str, Any]) -> str:
+    template = _jinja_env.get_template("resume.html.j2")
+    return template.render(**_build_resume_context(position, profile))
+
+
+async def generate_resume_pdf(position: str, profile: Dict[str, Any]) -> bytes:
+    """Sinh CV PDF: ưu tiên HTML/CSS (Playwright) cho bố cục đẹp/chuẩn; nếu
+    Playwright/Chromium không sẵn sàng thì fallback sang bản fpdf2 (không vỡ)."""
+    try:
+        from app.services.pdf_html import render_html_to_pdf
+
+        html = _render_resume_html(position, profile)
+        return await render_html_to_pdf(html)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("CV HTML->PDF không khả dụng (%s). Fallback fpdf2.", exc)
+        return _generate_resume_pdf_fpdf(position, profile)
+
 
 _FONTS_DIR = Path(__file__).parent / "fonts"
 _FONT_REGULAR = _FONTS_DIR / "DejaVuSans.ttf"
@@ -49,7 +120,7 @@ def _write_section_header(pdf: FPDF, title: str) -> None:
     pdf.ln(3)
 
 
-def generate_resume_pdf(position: str, profile: Dict[str, Any]) -> bytes:
+def _generate_resume_pdf_fpdf(position: str, profile: Dict[str, Any]) -> bytes:
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     _register_unicode_font(pdf)

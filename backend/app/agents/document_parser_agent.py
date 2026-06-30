@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from app.agents.schemas import CandidateProfileData
+from app.core.config import get_settings
 from app.core.database import db
 from app.core.llm_router import llm_router
 from app.services.embedding import build_chunks_from_profile, store_embedding
@@ -37,9 +38,10 @@ async def parse_documents(
     cv_text = _safe_text(cv_text)
     jd_text = _safe_text(jd_text) if jd_text else None
 
+    settings = get_settings()
     system = _load_prompt("document_parser.txt")
     user_prompt = f"""CV TEXT:
-{cv_text[:4000]}
+{cv_text[:6000]}
 
 JD TEXT:
 {jd_text[:4000] if jd_text else "No JD specified"}
@@ -48,7 +50,9 @@ Target Position: {position}
 Industry: {industry or "Not specified"}
 """
 
-    data, _ = await llm_router.generate_json(user_prompt, system)
+    data, _ = await llm_router.generate_json(
+        user_prompt, system, max_tokens=2200, model=settings.groq_quality_model
+    )
     try:
         profile = CandidateProfileData.model_validate(data)
     except Exception as exc:

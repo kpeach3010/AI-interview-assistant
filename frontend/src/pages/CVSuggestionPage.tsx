@@ -69,7 +69,14 @@ interface CandidateProfileData {
 }
 
 interface ReportData {
-  cv_suggestions?: Array<{ section: string; suggestion: string }>;
+  cv_suggestions?: Array<{
+    section: string;
+    suggestion: string;
+    priority?: string;
+    evidence?: string | null;
+    before?: string | null;
+    after?: string | null;
+  }>;
   jd_gap_analysis?: {
     matched_skills?: string[];
     missing_keywords?: string[];
@@ -172,32 +179,6 @@ export default function CVSuggestionPage() {
         setTimeout(() => setCopiedIndex(null), 2000);
       })
       .catch((err) => console.error('Không thể sao chép: ', err));
-  };
-
-  const getBeforeAfterForSection = (section: string) => {
-    const sec = section.toLowerCase();
-    if (sec.includes('experience') || sec.includes('kinh nghiệm') || sec.includes('lịch sử') || sec.includes('làm việc')) {
-      return {
-        before: '"Chịu trách nhiệm phát triển tính năng Frontend cho dự án, sửa lỗi hệ thống và code giao diện."',
-        after: '"Chủ trì phát triển 3 module Frontend cốt lõi bằng React & TypeScript, trực tiếp giải quyết 15+ bug nghiêm trọng và tối ưu hóa luồng tải trang giúp tăng 30% tốc độ tải."'
-      };
-    }
-    if (sec.includes('skill') || sec.includes('kỹ năng') || sec.includes('công nghệ') || sec.includes('kỹ thuật')) {
-      return {
-        before: '"Có kiến thức lập trình Web, làm việc với Java, Python, Javascript, React, SQL, Git..."',
-        after: '"Thành thạo lập trình hướng đối tượng (OOP) qua Java & Python; 2 năm kinh nghiệm thực chiến phát triển SPA với React.js; tối ưu truy vấn SQL (PostgreSQL)."'
-      };
-    }
-    if (sec.includes('project') || sec.includes('dự án') || sec.includes('sản phẩm')) {
-      return {
-        before: '"Làm dự án website bán hàng, quản lý sản phẩm, tài khoản và lịch sử giao dịch bằng PHP."',
-        after: '"Xây dựng web app E-commerce chuẩn RESTful API với Laravel (PHP) & MySQL; triển khai Docker để đóng gói sản phẩm và quản lý CI/CD qua GitHub Actions."'
-      };
-    }
-    return {
-      before: '"Làm việc chăm chỉ, nhiệt tình và hoàn thành tốt các nhiệm vụ được giao trong dự án."',
-      after: '"Ứng dụng quy trình Agile/Scrum quản lý công việc cá nhân; chủ động đề xuất giải pháp kỹ thuật giúp giảm thiểu 20% thời gian triển khai dự án."'
-    };
   };
 
   useEffect(() => {
@@ -744,12 +725,32 @@ export default function CVSuggestionPage() {
 
             {report && (
               <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin' }}>
-                {(report.cv_suggestions || []).map((s, i) => (
+                {[...(report.cv_suggestions || [])]
+                  .sort((a, b) => {
+                    const rank: Record<string, number> = { high: 0, medium: 1, low: 2 };
+                    return (rank[a.priority || "medium"] ?? 1) - (rank[b.priority || "medium"] ?? 1);
+                  })
+                  .map((s, i) => (
                   <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative group hover:border-emerald-200 transition-colors">
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">
-                        {s.section}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">
+                          {s.section}
+                        </span>
+                        {s.priority && (
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                              s.priority === "high"
+                                ? "bg-red-50 text-red-600"
+                                : s.priority === "low"
+                                ? "bg-slate-100 text-slate-500"
+                                : "bg-amber-50 text-amber-600"
+                            }`}
+                          >
+                            {s.priority === "high" ? "Ưu tiên cao" : s.priority === "low" ? "Thấp" : "Trung bình"}
+                          </span>
+                        )}
+                      </div>
                       <button
                         onClick={() => handleCopy(s.suggestion, i)}
                         className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-emerald-600 bg-slate-50 hover:bg-emerald-50 px-2 py-0.5 rounded border border-slate-100 hover:border-emerald-100 transition-all shadow-sm shrink-0"
@@ -771,22 +772,30 @@ export default function CVSuggestionPage() {
                       {s.suggestion}
                     </p>
 
-                    {/* Before/After Box */}
-                    {(() => {
-                      const sample = getBeforeAfterForSection(s.section);
-                      return (
-                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[10px] font-semibold space-y-2">
+                    {/* Bằng chứng trích từ CV (nếu có) */}
+                    {s.evidence && (
+                      <p className="text-[10px] text-slate-400 italic mb-2 leading-relaxed">
+                        Trích từ CV của bạn: "{s.evidence}"
+                      </p>
+                    )}
+
+                    {/* Before/After THẬT từ AI (theo công thức XYZ) — chỉ hiện khi có */}
+                    {(s.before || s.after) && (
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[10px] font-semibold space-y-2">
+                        {s.before && (
                           <div>
                             <span className="text-slate-400 uppercase tracking-wider text-[8px] block">Cách viết cũ</span>
-                            <p className="text-slate-500 line-through font-medium mt-0.5 leading-relaxed">{sample.before}</p>
+                            <p className="text-slate-500 line-through font-medium mt-0.5 leading-relaxed">{s.before}</p>
                           </div>
+                        )}
+                        {s.after && (
                           <div className="border-t border-slate-200/60 pt-1">
                             <span className="text-emerald-600 uppercase tracking-wider text-[8px] block">Đề xuất viết lại</span>
-                            <p className="text-slate-700 font-medium mt-0.5 leading-relaxed">{sample.after}</p>
+                            <p className="text-slate-700 font-medium mt-0.5 leading-relaxed">{s.after}</p>
                           </div>
-                        </div>
-                      );
-                    })()}
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
