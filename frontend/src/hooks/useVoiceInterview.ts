@@ -34,6 +34,10 @@ export function useVoiceInterview({ sessionId, token, voice, onComplete }: UseVo
   const [audioPath, setAudioPath] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
+  const [initialSessionMs, setInitialSessionMs] = useState(0);
+  const [initialQuestionMs, setInitialQuestionMs] = useState(0);
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // Auto read-aloud state & ref to avoid stale closure in WebSocket
   const [autoReadAloud, setAutoReadAloud] = useState(true);
   const autoReadAloudRef = useRef(true);
@@ -59,11 +63,14 @@ export function useVoiceInterview({ sessionId, token, voice, onComplete }: UseVo
       if (data.type === "history") {
         setMessages(data.messages);
         if (data.question_id) setCurrentQuestionId(data.question_id);
-        if (data.question_index !== undefined) setQuestionIndex(data.question_index);
+        if (data.question_index != null) setQuestionIndex(data.question_index);
         if (data.total_questions) setTotalQuestions(data.total_questions);
+        if (data.session_duration_ms != null) setInitialSessionMs(data.session_duration_ms);
+        if (data.question_duration_ms != null) setInitialQuestionMs(data.question_duration_ms);
         if (data.last_audio_base64) {
           setLastQuestionAudio(data.last_audio_base64);
         }
+        setIsInitialized(true);
       }
 
       if (data.type === "interviewer_speech") {
@@ -81,7 +88,7 @@ export function useVoiceInterview({ sessionId, token, voice, onComplete }: UseVo
           setLastQuestionAudio(null);
         }
         if (data.question_id) setCurrentQuestionId(data.question_id);
-        if (data.question_index !== undefined) setQuestionIndex(data.question_index);
+        if (data.question_index != null) setQuestionIndex(data.question_index);
         if (data.total_questions) setTotalQuestions(data.total_questions);
 
         // Reset transcription result for new question
@@ -219,5 +226,9 @@ export function useVoiceInterview({ sessionId, token, voice, onComplete }: UseVo
     clearTranscription,
     endInterview,
     onAudioEnded,
+    currentQuestionId,
+    initialSessionMs,
+    initialQuestionMs,
+    isInitialized,
   };
 }

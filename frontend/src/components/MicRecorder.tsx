@@ -1,14 +1,46 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
+
+// SpeechRecognition type definitions
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
 
 interface MicRecorderProps {
   onAudioChunk: (base64: string) => void;
+  onLiveTranscript?: (text: string) => void;
   disabled?: boolean;
 }
 
-export default function MicRecorder({ onAudioChunk, disabled }: MicRecorderProps) {
+export default function MicRecorder({ onAudioChunk, onLiveTranscript, disabled }: MicRecorderProps) {
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'vi-VN';
+
+      recognition.onresult = (event: any) => {
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          fullTranscript += event.results[i][0].transcript;
+        }
+        if (onLiveTranscript) {
+          onLiveTranscript(fullTranscript);
+        }
+      };
+      
+      recognitionRef.current = recognition;
+    }
+  }, [onLiveTranscript]);
 
   const sendFullRecording = useCallback(() => {
     if (chunksRef.current.length === 0) return;
@@ -43,6 +75,14 @@ export default function MicRecorder({ onAudioChunk, disabled }: MicRecorderProps
       // Record continuously without timeslice, export data on stop
       recorder.start();
       setRecording(true);
+      
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          console.error("Lỗi khi bắt đầu nhận diện giọng nói: ", e);
+        }
+      }
     } catch {
       alert("Không thể truy cập microphone. Vui lòng cấp quyền.");
     }
@@ -53,6 +93,13 @@ export default function MicRecorder({ onAudioChunk, disabled }: MicRecorderProps
       // stop() triggers ondataavailable then onstop to send blob
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.error("Lỗi khi dừng nhận diện giọng nói: ", e);
+      }
     }
     setRecording(false);
   };

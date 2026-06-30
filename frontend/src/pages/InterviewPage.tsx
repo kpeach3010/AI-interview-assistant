@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AudioPlayer from "../components/AudioPlayer";
 import InterviewProgress from "../components/InterviewProgress";
@@ -6,7 +6,8 @@ import MicRecorder from "../components/MicRecorder";
 import TranscriptPanel from "../components/TranscriptPanel";
 import { useAuth } from "../contexts/AuthContext";
 import { useVoiceInterview } from "../hooks/useVoiceInterview";
-import { apiFetch, fetchAnswerHint } from "../lib/api";
+import { useInterviewTimer, formatDurationText } from "../hooks/useInterviewTimer";
+import { apiFetch, fetchAnswerHint, submitSessionTiming, submitQuestionTiming } from "../lib/api";
 import {
   MicrophoneIcon,
   PencilSquareIcon,
@@ -19,6 +20,7 @@ import {
   PauseIcon,
   LightBulbIcon,
   ChevronUpIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 
 export default function InterviewPage() {
@@ -28,6 +30,7 @@ export default function InterviewPage() {
   const [completing, setCompleting] = useState(false);
   const [inputMode, setInputMode] = useState<"voice" | "text">("voice");
   const [textAnswer, setTextAnswer] = useState("");
+  const [liveTranscript, setLiveTranscript] = useState<string>("");
   const [editedVoiceText, setEditedVoiceText] = useState("");
   const [voice, setVoice] = useState(() => localStorage.getItem("ai_voice") || "vi-VN-HoaiMyNeural");
 
@@ -71,6 +74,10 @@ export default function InterviewPage() {
     clearTranscription,
     endInterview,
     onAudioEnded,
+    currentQuestionId,
+    initialSessionMs,
+    initialQuestionMs,
+    isInitialized,
   } = useVoiceInterview({
     sessionId: sessionId!,
     token: accessToken!,
@@ -78,11 +85,97 @@ export default function InterviewPage() {
     onComplete: handleComplete,
   });
 
-  // Sync voice transcription result into editable textarea
+  const { 
+    sessionElapsedMs, 
+    questionElapsedMs, 
+    startQuestion, 
+    pauseQuestion, 
+    completeSession,
+    getCurrentQuestionTime,
+    initializeTimers
+  } = useInterviewTimer();
+
+  const hasInitializedRef = useRef(false);
+
+  // Initialize timers when history is received
+  useEffect(() => {
+    if (currentQuestionId && !hasInitializedRef.current) {
+      const savedSessionMs = parseInt(sessionStorage.getItem(`session_${sessionId}_time`) || '0', 10);
+      const savedQuestionMs = parseInt(sessionStorage.getItem(`question_${currentQuestionId}_time`) || '0', 10);
+
+      const finalSessionMs = Math.max(initialSessionMs, savedSessionMs);
+      const finalQuestionMs = Math.max(initialQuestionMs, savedQuestionMs);
+
+      initializeTimers(finalSessionMs, finalQuestionMs, currentQuestionId);
+      hasInitializedRef.current = true;
+    }
+  }, [initialSessionMs, initialQuestionMs, currentQuestionId, sessionId, initializeTimers]);
+
+  // Save timings when user leaves the page or closes the tab
+  useEffect(() => {
+    const saveTimings = () => {
+      const sessionTime = completeSession();
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      
+      if (sessionTime && sessionTime.durationMs > 0) {
+        sessionStorage.setItem(`session_${sessionId}_time`, sessionTime.durationMs.toString());
+        fetch(`${apiUrl}/api/sessions/${sessionId}/timing`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ total_duration_ms: sessionTime.durationMs }),
+          keepalive: true
+        }).catch(() => {});
+      }
+
+      const qTime = getCurrentQuestionTime();
+      if (qTime && qTime.questionId && qTime.durationMs > 0) {
+        sessionStorage.setItem(`question_${qTime.questionId}_time`, qTime.durationMs.toString());
+        fetch(`${apiUrl}/api/sessions/${sessionId}/questions/${qTime.questionId}/timing`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ answer_duration_ms: qTime.durationMs }),
+          keepalive: true
+        }).catch(() => {});
+      }
+    };
+
+    window.addEventListener("beforeunload", saveTimings);
+    return () => {
+      window.removeEventListener("beforeunload", saveTimings);
+      saveTimings();
+    };
+  }, [sessionId, accessToken, completeSession, getCurrentQuestionTime]);
+
+  useEffect(() => {
+    if (currentQuestionId && !isComplete) {
+      const prevTime = startQuestion(currentQuestionId);
+      if (prevTime !== null && prevTime.questionId && prevTime.durationMs > 0) {
+        submitQuestionTiming(sessionId!, prevTime.questionId, prevTime.durationMs, accessToken!).catch(console.error);
+      }
+    }
+  }, [currentQuestionId, isComplete, startQuestion, sessionId, accessToken]);
+
+  // Auto-submit voice transcription result without review
   useEffect(() => {
     if (transcriptionResult !== null) {
-      setEditedVoiceText(transcriptionResult);
+      const time = pauseQuestion();
+      if (time) {
+        submitQuestionTiming(sessionId!, time.questionId, time.durationMs, accessToken!).catch(console.error);
+        const sessionTime = completeSession();
+        if (sessionTime) {
+          submitSessionTiming(sessionId!, sessionTime.durationMs, accessToken!).catch(console.error);
+        }
+      }
+      submitAnswer(transcriptionResult, audioPath);
+      resetInputs();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcriptionResult]);
 
   // Reset hint state whenever a new question appears
@@ -102,6 +195,14 @@ export default function InterviewPage() {
   }, [currentQuestionKey]);
 
   const handleEnd = () => {
+    const sessionTime = completeSession();
+    if (sessionTime && sessionTime.durationMs > 0) {
+      submitSessionTiming(sessionId!, sessionTime.durationMs, accessToken!).catch(console.error);
+    }
+    // Also submit the last question's time
+    if (currentQuestionId) {
+      submitQuestionTiming(sessionId!, currentQuestionId, questionElapsedMs, accessToken!).catch(console.error);
+    }
     endInterview();
     handleComplete();
   };
@@ -112,6 +213,14 @@ export default function InterviewPage() {
 
   const handleVoiceSubmit = () => {
     if (!editedVoiceText.trim()) return;
+    const time = pauseQuestion();
+    if (time) {
+      submitQuestionTiming(sessionId!, time.questionId, time.durationMs, accessToken!).catch(console.error);
+      const sessionTime = completeSession();
+      if (sessionTime) {
+        submitSessionTiming(sessionId!, sessionTime.durationMs, accessToken!).catch(console.error);
+      }
+    }
     submitAnswer(editedVoiceText, audioPath);
     setEditedVoiceText("");
     clearTranscription();
@@ -119,13 +228,26 @@ export default function InterviewPage() {
 
   const handleTextSubmit = () => {
     if (!textAnswer.trim()) return;
+    const time = pauseQuestion();
+    if (time) {
+      submitQuestionTiming(sessionId!, time.questionId, time.durationMs, accessToken!).catch(console.error);
+      const sessionTime = completeSession();
+      if (sessionTime) {
+        submitSessionTiming(sessionId!, sessionTime.durationMs, accessToken!).catch(console.error);
+      }
+    }
     submitAnswer(textAnswer, null);
     setTextAnswer("");
   };
 
   const handleReRecord = () => {
+    resetInputs();
+  };
+
+  const resetInputs = () => {
     clearTranscription();
     setEditedVoiceText("");
+    setLiveTranscript("");
   };
 
   const handleFetchHint = async () => {
@@ -157,11 +279,20 @@ export default function InterviewPage() {
 
   if (!sessionId || !accessToken) return null;
 
-  // Get the latest interviewer message as current question
+  if (!isInitialized) {
+    return (
+      <div className="max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <div className="w-12 h-12 rounded-full border-4 border-violet-100 border-t-violet-600 animate-spin"></div>
+        <p className="text-slate-500 font-medium animate-pulse">Đang kết nối và tải dữ liệu phỏng vấn...</p>
+      </div>
+    );
+  }
+
   const lastInterviewerMsg = [...messages]
     .reverse()
     .find((m) => m.role === "interviewer");
   const currentQuestionText = lastInterviewerMsg?.content || "Hệ thống đang chuẩn bị câu hỏi...";
+  const isFollowUp = lastInterviewerMsg?.message_type === "follow_up";
 
   // Kiểm tra xem AI có đang xử lý (người dùng vừa trả lời xong)
   const isAiProcessing = messages.length > 0 && messages[messages.length - 1].role === "candidate" && !isComplete;
@@ -179,10 +310,16 @@ export default function InterviewPage() {
             <option value="vi-VN-HoaiMyNeural">Giọng nữ</option>
             <option value="vi-VN-NamMinhNeural">Giọng nam</option>
           </select>
-          <span className={`text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 ${connected ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-            <span className={`w-2 h-2 rounded-full ${connected ? "bg-green-500 animate-ping" : "bg-red-500"}`}></span>
-            {connected ? "Đã kết nối" : "Đang kết nối..."}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+              <ClockIcon className="w-4 h-4 text-violet-500" />
+              {formatDurationText(sessionElapsedMs)}
+            </span>
+            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 ${connected ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+              <span className={`w-2 h-2 rounded-full ${connected ? "bg-green-500 animate-ping" : "bg-red-500"}`}></span>
+              {connected ? "Đã kết nối" : "Đang kết nối..."}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -205,12 +342,30 @@ export default function InterviewPage() {
 
               <div className="flex items-start justify-between gap-4 relative z-10">
                 <div className="space-y-3 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-violet-700 tracking-wider uppercase bg-violet-100/50 px-2.5 py-1 rounded-md">Câu hỏi từ nhà tuyển dụng</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-violet-700 tracking-wider uppercase bg-violet-100/50 px-2.5 py-1 rounded-md">Câu hỏi {questionIndex + 1}</span>
+                    {isFollowUp && (
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase bg-emerald-100/80 px-2 py-1 rounded-md flex items-center gap-1 shadow-sm" title="AI đang hỏi sâu thêm vào câu trả lời trước đó của bạn">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+                        Đào sâu
+                      </span>
+                    )}
+                    {!isAiProcessing && (
+                      <span className="text-xs font-medium text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
+                        <ClockIcon className="w-3 h-3" /> {formatDurationText(questionElapsedMs)}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-slate-800 text-[17px] font-medium leading-relaxed">
-                    {currentQuestionText}
-                  </p>
+                  {isAiProcessing ? (
+                    <div className="flex items-center gap-2 text-violet-600 mt-2 font-medium">
+                      <EllipsisHorizontalIcon className="w-6 h-6 animate-pulse" />
+                      <span className="animate-pulse">Đang phân tích và chuẩn bị câu hỏi tiếp theo...</span>
+                    </div>
+                  ) : (
+                    <p className="text-slate-800 text-[17px] font-medium leading-relaxed">
+                      {currentQuestionText}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col items-end gap-3 shrink-0">
@@ -239,12 +394,12 @@ export default function InterviewPage() {
                     onClick={handleFetchHint}
                     disabled={isLoadingHint || isAiSpeaking || !connected}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all ${isLoadingHint
-                        ? "bg-amber-400 text-white animate-pulse cursor-not-allowed"
-                        : showHint
-                          ? "bg-amber-500 text-white hover:bg-amber-600 hover:scale-105 active:scale-95"
-                          : hintText !== null
-                            ? "bg-amber-50 text-amber-600 border border-amber-300 hover:bg-amber-100 hover:scale-105 active:scale-95"
-                            : "bg-white text-amber-500 border border-amber-200 hover:bg-amber-50 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                      ? "bg-amber-400 text-white animate-pulse cursor-not-allowed"
+                      : showHint
+                        ? "bg-amber-500 text-white hover:bg-amber-600 hover:scale-105 active:scale-95"
+                        : hintText !== null
+                          ? "bg-amber-50 text-amber-600 border border-amber-300 hover:bg-amber-100 hover:scale-105 active:scale-95"
+                          : "bg-white text-amber-500 border border-amber-200 hover:bg-amber-50 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                       }`}
                     title={showHint ? "Ẩn gợi ý" : "Gợi ý câu trả lời"}
                   >
@@ -312,13 +467,6 @@ export default function InterviewPage() {
             </div>
           )}
 
-          {/* Trạng thái AI đang xử lý */}
-          {isAiProcessing && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm flex flex-col items-center justify-center gap-2">
-              <EllipsisHorizontalIcon className="w-14 h-14 text-violet-500 animate-pulse" />
-            </div>
-          )}
-
           {/* Lựa chọn và nhập liệu câu trả lời */}
           {!isComplete && !isAiProcessing && (
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
@@ -328,7 +476,7 @@ export default function InterviewPage() {
                     type="button"
                     onClick={() => {
                       setInputMode("voice");
-                      clearTranscription();
+                      resetInputs();
                     }}
                     className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${inputMode === "voice"
                       ? "bg-white text-violet-700 shadow-sm"
@@ -341,7 +489,7 @@ export default function InterviewPage() {
                     type="button"
                     onClick={() => {
                       setInputMode("text");
-                      clearTranscription();
+                      resetInputs();
                     }}
                     className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${inputMode === "text"
                       ? "bg-white text-violet-700 shadow-sm"
@@ -391,11 +539,23 @@ export default function InterviewPage() {
                 {inputMode === "voice" && (
                   <div className="flex flex-col items-center justify-center">
                     {transcriptionResult === null && !isTranscribing && (
-                      <div className="py-6">
+                      <div className="py-6 flex flex-col items-center w-full">
                         <MicRecorder
                           onAudioChunk={handleAudioRecording}
+                          onLiveTranscript={setLiveTranscript}
                           disabled={isAiSpeaking || !connected}
                         />
+                        {liveTranscript && (
+                          <div className="mt-6 w-full max-w-lg p-4 bg-slate-50 border border-slate-200 rounded-xl shadow-inner transition-all duration-300">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Đang nghe...</span>
+                            </div>
+                            <p className="text-[15px] text-slate-700 leading-relaxed italic">
+                              "{liveTranscript}"
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
 

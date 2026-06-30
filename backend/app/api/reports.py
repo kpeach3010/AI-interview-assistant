@@ -22,6 +22,7 @@ async def get_report(session_id: str, user: Annotated[dict, Depends(get_current_
         raise HTTPException(status_code=404, detail="Report not ready yet")
 
     evaluations = db.list_evaluations(session_id)
+    evaluations.sort(key=lambda e: (e.get("questions") or {}).get("order_index", 999))
 
     pdf_url = None
     if report.get("pdf_path") and report.get("pdf_bucket"):
@@ -35,8 +36,11 @@ async def get_report(session_id: str, user: Annotated[dict, Depends(get_current_
     profile = db.get_candidate_profile(session_id) or {}
     jd_gap_analysis = profile.get("jd_gap_analysis") if isinstance(profile, dict) else None
 
+    all_messages = db.list_messages(session_id)
+
     return ReportResponse(
         session_id=session_id,
+        total_duration_ms=session.get("total_duration_ms"),
         overall_score=float(report["overall_score"]),
         avg_content=float(report["avg_content"]),
         avg_relevance=float(report["avg_relevance"]),
@@ -48,6 +52,8 @@ async def get_report(session_id: str, user: Annotated[dict, Depends(get_current_
             {
                 "question_id": e["question_id"],
                 "question_text": (e.get("questions") or {}).get("question_text", ""),
+                "answer_duration_ms": (e.get("questions") or {}).get("answer_duration_ms"),
+                "candidate_answer": next((m["content"] for m in all_messages if m["role"] == "candidate" and m["question_id"] == e["question_id"]), None),
                 "category": (e.get("questions") or {}).get("category", ""),
                 "score_content": float(e["score_content"]),
                 "score_relevance": float(e["score_relevance"]),

@@ -135,6 +135,7 @@ model InterviewSession {
   startedAt            DateTime?     @map("started_at") @db.Timestamptz(6)
   completedAt          DateTime?     @map("completed_at") @db.Timestamptz(6)
   errorMessage         String?       @map("error_message")
+  totalDurationMs      Int?          @map("total_duration_ms")
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -194,6 +195,7 @@ model Question {
   isFollowUp       Boolean          @default(false) @map("is_follow_up")
   parentQuestionId String?          @map("parent_question_id") @db.Uuid
   sourceContext    Json?            @map("source_context")
+  answerDurationMs Int?             @map("answer_duration_ms")
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
   session        InterviewSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)

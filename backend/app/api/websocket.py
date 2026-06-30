@@ -120,9 +120,18 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 if msg["question_id"]:
                     last_question_id = msg["question_id"]
             
-            all_main_q = db.list_questions(session_id, main_only=True)
+            all_q = db.list_questions(session_id)
+            all_main_q = [q for q in all_q if not q.get("is_follow_up")]
             total_q = len(all_main_q)
-            q_idx = session.get("current_question_index", 0)
+            q_idx = session.get("current_question_index") or 0
+            
+            session_duration_ms = session.get("total_duration_ms") or 0
+            question_duration_ms = 0
+            if last_question_id:
+                for q in all_q:
+                    if q["id"] == last_question_id:
+                        question_duration_ms = q.get("answer_duration_ms") or 0
+                        break
 
             last_audio_base64 = None
             if messages[-1]["role"] == "interviewer" and messages[-1]["message_type"] in ("question", "follow_up"):
@@ -136,7 +145,9 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 "question_id": last_question_id,
                 "question_index": q_idx,
                 "total_questions": total_q,
-                "last_audio_base64": last_audio_base64
+                "last_audio_base64": last_audio_base64,
+                "session_duration_ms": session_duration_ms,
+                "question_duration_ms": question_duration_ms
             })
 
             # Nếu user đã trả lời xong trước khi thoát mà AI chưa phản hồi, sinh câu tiếp theo

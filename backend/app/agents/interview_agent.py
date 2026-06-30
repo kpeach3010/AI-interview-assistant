@@ -39,9 +39,10 @@ Nhiệm vụ: Đánh giá câu trả lời cuối cùng của ứng viên và qu
 
 Nguyên tắc:
 - Chỉ hỏi đào sâu TỐI ĐA 2 lần cho 1 câu hỏi chính (Đã đào sâu: {follow_up_count} lần).
-- Hỏi đào sâu (follow_up) nếu: Câu trả lời chung chung, thiếu kết quả (STAR thiếu Result), hoặc có điểm thú vị cần làm rõ.
-- Chuyển câu (next_question) nếu: Ứng viên đã trả lời chi tiết hoặc không cần khai thác thêm.
-- CỰC KỲ QUAN TRỌNG: Nếu chọn next_question, bạn phải viết lại (rephrase) câu hỏi tiếp theo một cách khéo léo để tạo sự chuyển ý tự nhiên từ câu trả lời vừa rồi của ứng viên sang chủ đề mới (tránh đọc như cái máy).
+- Hỏi đào sâu (follow_up) nếu: Câu trả lời thiếu kết quả (Result trong STAR), hoặc có điểm thú vị cần làm rõ. Phải hỏi xoáy vào 1 chi tiết cụ thể ứng viên vừa nói.
+- Chuyển câu (next_question) nếu: Ứng viên đã trả lời đủ chi tiết. Khi chuyển, viết lại (rephrase) câu hỏi tiếp theo để tạo sự liên kết tự nhiên.
+- VĂN PHONG GIAO TIẾP: Câu hỏi sinh ra (dù là follow-up hay next_question) phải RẤT NGẮN GỌN (dưới 25 từ), tự nhiên như văn nói. KHÔNG gộp 2-3 ý vào một câu.
+- TUYỆT ĐỐI KHÔNG dùng câu hỏi đóng (Có/Không). Thay vì hỏi "Bạn có nghĩ rằng...", hãy hỏi "Yếu tố X đã ảnh hưởng như thế nào...".
 
 Lịch sử trò chuyện gần nhất:
 {chat_history_str}
@@ -72,7 +73,13 @@ Ngôn ngữ: {language}
                     "parent_question_id": current_q["id"],
                 }
             )
-            return {"action": "follow_up", "text": text, "question_id": follow_up["id"]}
+            return {
+                "action": "follow_up", 
+                "text": text, 
+                "question_id": follow_up["id"],
+                "question_index": idx,
+                "total_questions": len(main_questions),
+            }
 
         if action == "next_question" and text:
             next_rephrased = text

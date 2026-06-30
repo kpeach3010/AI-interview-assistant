@@ -206,21 +206,7 @@ export default function LandingPage() {
           <div style={{ position: "relative", width: "100%", zIndex: 10, marginBottom: "4rem" }}>
 
             {/* Hero Image */}
-            <div className="anim-hero anim-delay2" style={{
-              position: "relative",
-              width: "100%",
-              maxWidth: 900,
-              height: "auto",
-              aspectRatio: "16/9",
-              margin: "0 auto",
-              borderRadius: 32,
-              overflow: "hidden",
-              boxShadow: "0 20px 50px rgba(124,58,237,0.18)",
-              background: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}>
+            <div className="anim-hero anim-delay2 w-full max-w-[900px] mx-auto aspect-video rounded-3xl overflow-hidden bg-white flex items-center justify-center relative shadow-[0_20px_50px_rgba(124,58,237,0.18)]">
               <img
                 src="/1.png"
                 alt="Hero Illustration"
@@ -228,63 +214,33 @@ export default function LandingPage() {
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
-                  borderRadius: 32,
                 }}
               />
             </div>
 
-            {/* Overlays Container (Centered within layout grid) */}
-            <div style={{
-              position: "absolute",
-              bottom: -40,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: "100%",
-              maxWidth: 1100,
-              height: 1,
-              pointerEvents: "none",
-              zIndex: 25
-            }}>
+            {/* Overlays Container (Responsive flexbox) */}
+            <div className="absolute -bottom-10 md:-bottom-12 left-1/2 -translate-x-1/2 w-full max-w-[1100px] px-4 md:px-10 flex flex-col md:flex-row items-center justify-between gap-6 z-20 pointer-events-none">
+              
               {/* Text Card */}
-              <div className="anim-hero anim-delay3" style={{
-                position: "absolute", bottom: -20, left: 40,
-                background: "rgba(255, 255, 255, 0.85)", 
-                backdropFilter: "blur(24px)",
-                padding: "1.25rem 1.5rem", 
-                borderRadius: 24,
-                border: "1px solid rgba(255, 255, 255, 0.6)",
-                maxWidth: 420, 
-                boxShadow: "0 24px 48px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.05)",
-                pointerEvents: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12
-              }}>
+              <div className="anim-hero anim-delay3 w-full md:max-w-[420px] pointer-events-auto bg-white/85 backdrop-blur-xl p-5 md:p-6 rounded-3xl border border-white/60 shadow-[0_24px_48px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.05)] flex flex-col gap-3">
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 0 4px rgba(16, 185, 129, 0.15)" }} />
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#10b981", letterSpacing: 0.5, textTransform: "uppercase" }}>Sẵn sàng</span>
                 </div>
-                <p style={{
-                  fontSize: 16, color: "#334155", lineHeight: 1.6, margin: 0,
-                  fontWeight: 500
-                }}>
+                <p style={{ fontSize: 16, color: "#334155", lineHeight: 1.6, margin: 0, fontWeight: 500 }}>
                   Phân tích CV, luyện phỏng vấn thực tế và nhận <span style={{ color: "#7c3aed", fontWeight: 700 }}>đánh giá chi tiết</span> để tự tin hơn trên hành trình tìm việc.
                 </p>
               </div>
 
-              {/* Buttons on the right side of the card */}
-              <div className="anim-hero anim-delay3" style={{
-                position: "absolute", bottom: 16, left: 620,
-                display: "flex", gap: 12, alignItems: "center",
-                pointerEvents: "auto"
-              }}>
+              {/* Buttons */}
+              <div className="anim-hero anim-delay3 flex flex-wrap justify-center gap-3 pointer-events-auto w-full md:w-auto">
                 {user ? (
                   <Link to="/dashboard" style={{
                     background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)", color: "white", padding: "14px 28px",
                     borderRadius: 99, fontWeight: 600, fontSize: 15, textDecoration: "none",
                     boxShadow: "0 10px 25px rgba(124, 58, 237, 0.3)",
                     transition: "transform 0.15s, opacity 0.2s"
-                  }} className="btn-primary">
+                  }} className="btn-primary w-full sm:w-auto text-center">
                     Tạo phiên phỏng vấn ↗
                   </Link>
                 ) : (
@@ -295,7 +251,7 @@ export default function LandingPage() {
                       boxShadow: "0 10px 25px rgba(124, 58, 237, 0.3)",
                       transition: "transform 0.15s, opacity 0.2s",
                       whiteSpace: "nowrap"
-                    }} className="btn-primary">
+                    }} className="btn-primary w-full sm:w-auto text-center">
                       Luyện tập miễn phí ↗
                     </Link>
                     <Link to="/login" style={{
@@ -304,7 +260,7 @@ export default function LandingPage() {
                       borderRadius: 99, fontWeight: 600, fontSize: 15, textDecoration: "none",
                       border: "1.5px solid #e2e8f0", boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
                       transition: "background 0.2s"
-                    }} className="btn-ghost">
+                    }} className="btn-ghost w-full sm:w-auto text-center">
                       Đăng nhập
                     </Link>
                   </>
@@ -317,10 +273,7 @@ export default function LandingPage() {
 
         {/* ── STATS BAR ── */}
         <section style={{ background: "#fafafa", borderTop: "1px solid #f1f5f9", borderBottom: "1px solid #f1f5f9" }}>
-          <div style={{
-            maxWidth: 1200, margin: "0 auto", padding: "2rem 2rem",
-            display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", textAlign: "center"
-          }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center max-w-[1200px] mx-auto px-8 py-10">
             {[
               { num: "10–15 câu hỏi", label: "Câu hỏi cá nhân hoá từ CV của bạn" },
               { num: "2 ngôn ngữ", label: "Hỗ trợ Tiếng Việt & English" },
@@ -337,7 +290,7 @@ export default function LandingPage() {
         {/* ── FEATURE CARDS ── */}
         <section style={{ maxWidth: 1200, margin: "0 auto", padding: "5rem 2rem" }}>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "2.5rem", alignItems: "start" }}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start" style={{ gap: "2.5rem" }}>
 
             {/* Left Column - Large visual */}
             <motion.div

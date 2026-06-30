@@ -3,6 +3,31 @@ import { useAuth } from "../contexts/AuthContext";
 import { HomeIcon, ChartBarIcon, ClockIcon, Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from "@heroicons/react/24/outline";
 import React, { useState } from "react";
 
+const NavItem = ({ 
+  icon: Icon, 
+  label, 
+  isActive, 
+  onClick 
+}: { 
+  icon: React.ComponentType<{ className?: string }>, 
+  label: string, 
+  isActive: boolean, 
+  onClick: () => void 
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full transition-colors font-medium text-sm w-full md:w-auto ${
+        isActive ? "bg-violet-100 text-violet-600" : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+      }`}
+    >
+      <span>{label}</span>
+      <Icon className={`w-4 h-4 stroke-[2.5px] ${isActive ? "text-violet-600" : "text-slate-500"}`} />
+    </button>
+  );
+};
+
 export default function AppHeader() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -14,20 +39,11 @@ export default function AppHeader() {
     navigate("/login");
   };
 
-  const NavItem = ({ to, icon: Icon, label }: { to: string, icon: React.ComponentType<{ className?: string }>, label: string }) => {
-    const isActive = location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
-    return (
-      <button
-        type="button"
-        onClick={() => { navigate(to); setIsMenuOpen(false); }}
-        className={`flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full transition-colors font-medium text-sm w-full md:w-auto ${
-          isActive ? "bg-violet-100 text-violet-600" : "bg-slate-50 text-slate-600 hover:bg-slate-100"
-        }`}
-      >
-        <span>{label}</span>
-        <Icon className={`w-4 h-4 stroke-[2.5px] ${isActive ? "text-violet-600" : "text-slate-500"}`} />
-      </button>
-    );
+  const getIsActive = (to: string) => location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
+  
+  const handleNavClick = (to: string) => {
+    navigate(to);
+    setIsMenuOpen(false);
   };
 
   return (
@@ -53,11 +69,11 @@ export default function AppHeader() {
 
           {/* Desktop Center Nav (Absolute Centered) */}
           <nav className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-2">
-            <NavItem to="/" icon={HomeIcon} label="Trang chủ" />
+            <NavItem isActive={getIsActive("/")} onClick={() => handleNavClick("/")} icon={HomeIcon} label="Trang chủ" />
             {user && (
               <>
-                <NavItem to="/dashboard" icon={ChartBarIcon} label="Tạo phiên" />
-                <NavItem to="/history" icon={ClockIcon} label="Lịch sử" />
+                <NavItem isActive={getIsActive("/dashboard")} onClick={() => handleNavClick("/dashboard")} icon={ChartBarIcon} label="Tạo phiên" />
+                <NavItem isActive={getIsActive("/history")} onClick={() => handleNavClick("/history")} icon={ClockIcon} label="Lịch sử" />
               </>
             )}
           </nav>
@@ -96,11 +112,11 @@ export default function AppHeader() {
         {isMenuOpen && (
           <div className="md:hidden border-t border-slate-100 py-4 space-y-4">
             <nav className="flex flex-col gap-2">
-              <NavItem to="/" icon={HomeIcon} label="Trang chủ" />
+              <NavItem isActive={getIsActive("/")} onClick={() => handleNavClick("/")} icon={HomeIcon} label="Trang chủ" />
               {user && (
                 <>
-                  <NavItem to="/dashboard" icon={ChartBarIcon} label="Tạo phiên" />
-                  <NavItem to="/history" icon={ClockIcon} label="Lịch sử" />
+                  <NavItem isActive={getIsActive("/dashboard")} onClick={() => handleNavClick("/dashboard")} icon={ChartBarIcon} label="Tạo phiên" />
+                  <NavItem isActive={getIsActive("/history")} onClick={() => handleNavClick("/history")} icon={ClockIcon} label="Lịch sử" />
                 </>
               )}
             </nav>
