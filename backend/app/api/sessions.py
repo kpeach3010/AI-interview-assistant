@@ -6,7 +6,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 
 from app.services.pdf_resume import generate_resume_pdf
 from app.agents.pipeline import run_document_pipeline, run_evaluation_pipeline
-from app.api.schemas import CreateSessionRequest, QuestionResponse, SessionResponse
+from app.api.schemas import (
+    CreateSessionRequest,
+    QuestionResponse,
+    SessionResponse,
+    SessionTimingUpdate,
+    QuestionTimingUpdate,
+)
 from app.core.auth import get_current_user
 from app.core.database import db
 
@@ -165,6 +171,35 @@ async def complete_session(
     db.update_session(session_id, {"status": "evaluating"})
     background_tasks.add_task(run_evaluation_pipeline, session_id)
     return {"status": "evaluating", "message": "Dang danh gia buoi phong van..."}
+
+
+@router.patch("/{session_id}/timing")
+async def update_session_timing(
+    session_id: str,
+    body: SessionTimingUpdate,
+    user: Annotated[dict, Depends(get_current_user)],
+):
+    session = db.get_session(session_id, user["sub"])
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    db.update_session_duration(session_id, body.total_duration_ms)
+    return {"status": "success"}
+
+
+@router.patch("/{session_id}/questions/{question_id}/timing")
+async def update_question_timing(
+    session_id: str,
+    question_id: str,
+    body: QuestionTimingUpdate,
+    user: Annotated[dict, Depends(get_current_user)],
+):
+    session = db.get_session(session_id, user["sub"])
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    db.update_question_duration(question_id, body.answer_duration_ms)
+    return {"status": "success"}
 
 
 @router.get("/{session_id}/messages")

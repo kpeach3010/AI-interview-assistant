@@ -23,6 +23,14 @@ class CreateSessionRequest(BaseModel):
     language: str = "vi"
 
 
+class SessionTimingUpdate(BaseModel):
+    total_duration_ms: int
+
+
+class QuestionTimingUpdate(BaseModel):
+    answer_duration_ms: int
+
+
 class SessionResponse(BaseModel):
     id: str
     title: str | None
@@ -50,6 +58,7 @@ class QuestionResponse(BaseModel):
 
 class ReportResponse(BaseModel):
     session_id: str
+    total_duration_ms: int | None = None
     overall_score: float
     avg_content: float
     avg_relevance: float

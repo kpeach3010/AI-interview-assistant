@@ -76,10 +76,12 @@ export interface Session {
   avg_relevance?: number | null;
   avg_completeness?: number | null;
   avg_presentation?: number | null;
+  total_duration_ms?: number | null;
 }
 
 export interface Report {
   session_id: string;
+  total_duration_ms?: number | null;
   overall_score: number;
   avg_content: number;
   avg_relevance: number;
@@ -93,8 +95,10 @@ export interface Report {
     score_overall: number;
     feedback: string;
     sample_answer: string;
+    candidate_answer?: string | null;
     strengths: string[];
     weaknesses: string[];
+    answer_duration_ms?: number | null;
   }>;
   pdf_url: string | null;
 }
@@ -115,6 +119,37 @@ export async function fetchAnswerHint(
     {
       method: "POST",
       body: JSON.stringify({ question_text: questionText, language }),
+    },
+    token
+  );
+}
+
+export async function submitSessionTiming(
+  sessionId: string,
+  totalDurationMs: number,
+  token: string
+) {
+  return apiFetch(
+    `/sessions/${sessionId}/timing`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ total_duration_ms: totalDurationMs }),
+    },
+    token
+  );
+}
+
+export async function submitQuestionTiming(
+  sessionId: string,
+  questionId: string,
+  answerDurationMs: number,
+  token: string
+) {
+  return apiFetch(
+    `/sessions/${sessionId}/questions/${questionId}/timing`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ answer_duration_ms: answerDurationMs }),
     },
     token
   );

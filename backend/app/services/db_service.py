@@ -81,6 +81,9 @@ class DatabaseService:
     def update_session(self, session_id: str, data: dict) -> dict:
         return self._table("interview_sessions").update(data).eq("id", session_id).execute().data[0]
 
+    def update_session_duration(self, session_id: str, duration_ms: int) -> dict:
+        return self._table("interview_sessions").update({"total_duration_ms": duration_ms}).eq("id", session_id).execute().data[0]
+
     def list_sessions(self, user_id: str) -> list[dict]:
         return (
             self._table("interview_sessions")
@@ -115,6 +118,9 @@ class DatabaseService:
 
     def create_question(self, data: dict) -> dict:
         return self._table("questions").insert(data).execute().data[0]
+
+    def update_question_duration(self, question_id: str, duration_ms: int) -> dict:
+        return self._table("questions").update({"answer_duration_ms": duration_ms}).eq("id", question_id).execute().data[0]
 
     def list_questions(self, session_id: str, main_only: bool = False) -> list[dict]:
         q = self._table("questions").select("*").eq("session_id", session_id).order("order_index")

@@ -96,7 +96,7 @@ export default function HistoryPage() {
   const navigate = useNavigate();
 
   const completedSessions = sessions.filter((s) => s.status === "completed" && s.overall_score !== undefined && s.overall_score !== null);
-  
+
   const trendData = [...completedSessions]
     .reverse()
     .map((s, index) => ({
@@ -181,7 +181,7 @@ export default function HistoryPage() {
       <div className="grid lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-2 space-y-6">
 
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex items-center justify-between"
@@ -198,7 +198,7 @@ export default function HistoryPage() {
           </motion.div>
 
           {/* Stats Component */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -239,15 +239,15 @@ export default function HistoryPage() {
           </motion.div>
 
           {sessions.length === 0 ? (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }} 
-              animate={{ opacity: 1, scale: 1 }} 
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 }}
               className="bg-white rounded-3xl p-10 text-center shadow-[0_10px_40px_rgba(0,0,0,0.03)] border border-slate-100 relative overflow-hidden group"
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-500"></div>
               <div className="absolute -inset-24 bg-gradient-to-tr from-violet-100/30 to-emerald-100/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-full blur-3xl z-0"></div>
-              <motion.div 
+              <motion.div
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 className="w-20 h-20 bg-violet-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner relative z-10"
@@ -272,9 +272,8 @@ export default function HistoryPage() {
               <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 w-max h-[44px] items-center mb-6">
                 <button
                   onClick={() => setActiveTab("list")}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${
-                    activeTab === "list" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                  }`}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${activeTab === "list" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                    }`}
                 >
                   <ClockIcon className="w-4 h-4" />
                   Lịch sử phỏng vấn
@@ -282,9 +281,8 @@ export default function HistoryPage() {
                 {completedCount > 0 && (
                   <button
                     onClick={() => setActiveTab("analytics")}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${
-                      activeTab === "analytics" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                    }`}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${activeTab === "analytics" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                      }`}
                   >
                     <PresentationChartLineIcon className="w-4 h-4" />
                     Tiến độ & Phân tích
@@ -311,26 +309,23 @@ export default function HistoryPage() {
                       <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 shrink-0 h-[48px] items-center">
                         <button
                           onClick={() => setStatusFilter("all")}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${
-                            statusFilter === "all" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                          }`}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "all" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                            }`}
                         >
                           Tất cả
                         </button>
                         <button
                           onClick={() => setStatusFilter("processing")}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${
-                            statusFilter === "processing" ? "bg-white text-amber-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                          }`}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "processing" ? "bg-white text-amber-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                            }`}
                         >
                           <span className={`w-2 h-2 rounded-full ${statusFilter === "processing" ? "bg-amber-500 animate-pulse" : "bg-slate-400"}`}></span>
                           Đang xử lý
                         </button>
                         <button
                           onClick={() => setStatusFilter("completed")}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${
-                            statusFilter === "completed" ? "bg-white text-emerald-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-                          }`}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "completed" ? "bg-white text-emerald-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                            }`}
                         >
                           <CheckCircleIcon className="w-4 h-4" />
                           Hoàn thành
@@ -349,17 +344,17 @@ export default function HistoryPage() {
                         <p className="text-slate-500 text-sm font-medium">Thử thay đổi từ khóa hoặc bộ lọc để xem các kết quả khác.</p>
                       </div>
                     ) : (
-                      <motion.div 
+                      <motion.div
                         variants={containerVariants}
                         initial="hidden"
                         animate="show"
-                        className="grid gap-4 md:max-h-[600px] md:overflow-y-auto pr-2 pb-2 -mr-2" 
+                        className="grid gap-4 md:max-h-[600px] md:overflow-y-auto pr-2 pb-2 -mr-2"
                         style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}
                       >
                         {filteredSessions.map((s) => {
                           const isActionable = ["ready", "active", "completed", "evaluating"].includes(s.status);
                           const isReport = ["completed", "evaluating"].includes(s.status);
-                          
+
                           return (
                             <motion.div
                               variants={itemVariants}
@@ -372,18 +367,16 @@ export default function HistoryPage() {
                                   navigate(`/report/${s.id}`);
                                 }
                               }}
-                              className={`relative bg-white rounded-2xl py-5 pr-5 pl-7 border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_30px_rgba(124,58,237,0.08)] hover:border-violet-200 transition-all duration-300 group flex flex-col md:flex-row md:items-center justify-between gap-4 overflow-hidden ${
-                                isActionable ? "cursor-pointer" : ""
-                              }`}
+                              className={`relative bg-white rounded-2xl py-5 pr-5 pl-7 border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_30px_rgba(124,58,237,0.08)] hover:border-violet-200 transition-all duration-300 group flex flex-col md:flex-row md:items-center justify-between gap-4 overflow-hidden ${isActionable ? "cursor-pointer" : ""
+                                }`}
                             >
-                              <div className={`absolute top-0 left-0 bottom-0 w-1.5 transition-colors ${
-                                s.status === "completed" ? "bg-emerald-500" :
-                                s.status === "evaluating" ? "bg-purple-500" :
-                                s.status === "active" ? "bg-amber-500" :
-                                s.status === "ready" ? "bg-blue-500" :
-                                s.status === "parsing" ? "bg-orange-500" :
-                                "bg-slate-300"
-                              }`} />
+                              <div className={`absolute top-0 left-0 bottom-0 w-1.5 transition-colors ${s.status === "completed" ? "bg-emerald-500" :
+                                  s.status === "evaluating" ? "bg-purple-500" :
+                                    s.status === "active" ? "bg-amber-500" :
+                                      s.status === "ready" ? "bg-blue-500" :
+                                        s.status === "parsing" ? "bg-orange-500" :
+                                          "bg-slate-300"
+                                }`} />
 
                               <div className="absolute inset-0 bg-gradient-to-r from-violet-50/30 to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
 
@@ -401,11 +394,11 @@ export default function HistoryPage() {
                                     })}
                                   </span>
                                 </div>
-                                
+
                                 <h3 className="text-lg font-extrabold text-slate-800 mb-2.5 group-hover:text-violet-700 transition-colors">
                                   {s.title || s.position_applied || "Vị trí không xác định"}
                                 </h3>
-                                
+
                                 <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
                                   {s.industry && (
                                     <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 shadow-sm">
@@ -445,9 +438,9 @@ export default function HistoryPage() {
                   </div>
                 </div>
               ) : (
-                <motion.div 
-                  initial={{ opacity: 0, y: 15 }} 
-                  animate={{ opacity: 1, y: 0 }} 
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
                   className="space-y-6 animate-fade-in"
                 >
                   {/* Summary Banner */}
@@ -458,7 +451,7 @@ export default function HistoryPage() {
                       Phân tích tiến độ & Xu hướng học tập
                     </h3>
                     <p className="text-violet-100 text-sm font-medium leading-relaxed relative z-10">
-                      {trendData.length >= 2 
+                      {trendData.length >= 2
                         ? `AI ghi nhận bạn đã hoàn thành ${completedCount} phiên phỏng vấn. Điểm số gần đây nhất của bạn là (${trendData[trendData.length - 1].score}/10). Hãy tiếp tục duy trì luyện tập để đạt kết quả tốt nhất!`
                         : `Hoàn thành thêm các buổi phỏng vấn thoại tiếp theo để kích hoạt biểu đồ phân tích tăng trưởng điểm số và phân tích kỹ năng chi tiết.`}
                     </p>
@@ -478,8 +471,8 @@ export default function HistoryPage() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} />
                             <YAxis domain={[0, 10]} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} />
-                            <RechartsTooltip 
-                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} 
+                            <RechartsTooltip
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
                               formatter={(value: any, _name: any, props: any) => [`${value} / 10`, `Điểm (${props.payload.position})`]}
                             />
                             <Line type="monotone" dataKey="score" stroke="#7c3aed" strokeWidth={3} activeDot={{ r: 6 }} dot={{ r: 4, stroke: '#7c3aed', strokeWidth: 2, fill: '#fff' }} />
@@ -645,10 +638,10 @@ export default function HistoryPage() {
           )}
         </div>
 
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }} 
-          animate={{ opacity: 1, x: 0 }} 
-          transition={{ duration: 0.6, delay: 0.2 }} 
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
           className="lg:col-span-1 space-y-6"
         >
           {/* CTA Khung Tím - Cột phải */}
@@ -672,17 +665,17 @@ export default function HistoryPage() {
               <ChartBarIcon className="w-6 h-6 text-violet-500" />
               4 tiêu chí <span className="text-violet-600">đánh giá</span>
             </h2>
-            
+
             <div className="relative h-[180px]">
               <AnimatePresence mode="wait">
                 {(() => {
                   const item = EVALUATION_CRITERIA[activeCriterion];
                   const Icon = item.Icon;
                   return (
-                    <motion.div 
+                    <motion.div
                       key={activeCriterion}
-                      initial={{ opacity: 0, y: 20 }} 
-                      animate={{ opacity: 1, y: 0 }} 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
                       transition={{ duration: 0.3 }}
                       className="absolute inset-0 bg-gradient-to-br from-white to-slate-50 rounded-2xl p-6 border border-slate-100 shadow-[0_4px_15px_rgba(0,0,0,0.02)] flex flex-col justify-center overflow-hidden"
@@ -693,13 +686,13 @@ export default function HistoryPage() {
                       <div className="relative z-10">
                         <div className="flex items-start gap-3 mb-3">
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${item.bg}`}>
-                              <Icon className={`w-6 h-6 ${item.color}`} strokeWidth={2.5} />
+                            <Icon className={`w-6 h-6 ${item.color}`} strokeWidth={2.5} />
                           </div>
                           <div>
-                              <h3 className="font-extrabold text-slate-800 text-base">{item.title}</h3>
-                              <div className={`px-2 py-0.5 mt-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block ${item.bg} ${item.color}`}>
-                                  {item.label}
-                              </div>
+                            <h3 className="font-extrabold text-slate-800 text-base">{item.title}</h3>
+                            <div className={`px-2 py-0.5 mt-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block ${item.bg} ${item.color}`}>
+                              {item.label}
+                            </div>
                           </div>
                         </div>
                         <p className="text-slate-600 text-sm font-medium leading-relaxed">
@@ -717,9 +710,8 @@ export default function HistoryPage() {
                 <button
                   key={idx}
                   onClick={() => setActiveCriterion(idx)}
-                  className={`h-2.5 rounded-full transition-all duration-300 shadow-inner ${
-                    idx === activeCriterion ? "w-8 bg-violet-600" : "w-2.5 bg-slate-200 hover:bg-violet-400"
-                  }`}
+                  className={`h-2.5 rounded-full transition-all duration-300 shadow-inner ${idx === activeCriterion ? "w-8 bg-violet-600" : "w-2.5 bg-slate-200 hover:bg-violet-400"
+                    }`}
                   aria-label={`Xem tiêu chí ${idx + 1}`}
                 />
               ))}
