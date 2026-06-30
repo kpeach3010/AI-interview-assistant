@@ -22,11 +22,13 @@ import {
 import { StarIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch, ApiError, type Session } from '../lib/api';
+import { formatDurationText } from '../hooks/useInterviewTimer';
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
 // Define an independent interface to avoid conflict with the original Report type
 interface ReportData {
+  total_duration_ms?: number;
   overall_score?: number;
   avg_content?: number;
   avg_relevance?: number;
@@ -42,6 +44,8 @@ interface ReportData {
     score_overall?: number;
     feedback: string;
     sample_answer?: string;
+    candidate_answer?: string | null;
+    answer_duration_ms?: number;
   }>;
 }
 
@@ -70,7 +74,7 @@ export default function ReportPage() {
   const analyzeSpeech = (text: string, lang: string) => {
     if (!text) return null;
     const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-    
+
     const vietnameseFillers = [/ừm/gi, /\bờ\b/gi, /\bthì\b/gi, /\blà\b/gi, /\bkiểu\b/gi, /\bđó\b/gi];
     const englishFillers = [/\buh\b/gi, /\bum\b/gi, /\blike\b/gi, /\bso\b/gi, /\byou know\b/gi, /\bactually\b/gi];
     const fillersRegex = lang === 'en' ? englishFillers : vietnameseFillers;
@@ -83,7 +87,7 @@ export default function ReportPage() {
     const seed = wordCount * 7 + text.length * 3;
     const baseWpm = 125 + (seed % 25);
     const wpm = wordCount > 5 ? baseWpm : 0;
-    
+
     let paceFeedback = "Tốc độ nói vừa phải, dễ nghe";
     if (wpm > 155) paceFeedback = "Tốc độ nói hơi nhanh, hãy nói chậm lại";
     else if (wpm > 0 && wpm < 110) paceFeedback = "Tốc độ nói hơi chậm, hãy nói trôi chảy hơn";
@@ -240,11 +244,11 @@ export default function ReportPage() {
 
   const chartData = report
     ? [
-        { subject: 'Nội dung', score: report?.avg_content || 0 },
-        { subject: 'Liên quan', score: report?.avg_relevance || 0 },
-        { subject: 'Đầy đủ', score: report?.avg_completeness || 0 },
-        { subject: 'Trình bày', score: report?.avg_presentation || 0 },
-      ]
+      { subject: 'Nội dung', score: report?.avg_content || 0 },
+      { subject: 'Liên quan', score: report?.avg_relevance || 0 },
+      { subject: 'Đầy đủ', score: report?.avg_completeness || 0 },
+      { subject: 'Trình bày', score: report?.avg_presentation || 0 },
+    ]
     : [];
 
   return (
@@ -275,6 +279,13 @@ export default function ReportPage() {
             <ChartBarIcon className="w-6 h-6 text-violet-500" />
             Chi tiết đánh giá cho vị trí: <span className="text-slate-800 font-bold">{session?.position_applied}</span>
           </p>
+          {(report?.total_duration_ms || session?.total_duration_ms) ? (
+            <p className="text-slate-500 mt-1 font-medium flex items-center gap-2 text-sm">
+              <span className="bg-slate-100 px-2 py-1 rounded-md">
+                Tổng thời gian phỏng vấn: <span className="font-bold text-slate-700">{formatDurationText(report?.total_duration_ms || session?.total_duration_ms || 0)}</span>
+              </span>
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3">
@@ -324,15 +335,15 @@ export default function ReportPage() {
               >
                 <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-white opacity-10 group-hover:scale-150 transition-transform duration-700"></div>
                 <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 rounded-full bg-indigo-500 opacity-20 blur-xl"></div>
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="absolute -top-16 -left-16 w-48 h-48 border border-white/10 rounded-full border-dashed pointer-events-none"></motion.div>
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="absolute -top-16 -left-16 w-48 h-48 border border-white/10 rounded-full border-dashed pointer-events-none"></motion.div>
 
                 <h3 className="text-violet-100 font-bold text-sm uppercase tracking-widest mb-2 relative z-10">
                   Điểm đánh giá tổng thể
                 </h3>
                 <div className="flex items-end justify-center gap-1 relative z-10 mb-4">
-              <motion.span animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }} className="text-6xl font-black drop-shadow-md">
-                {(report?.overall_score || 0).toFixed(1)}
-              </motion.span>
+                  <motion.span animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }} className="text-6xl font-black drop-shadow-md">
+                    {(report?.overall_score || 0).toFixed(1)}
+                  </motion.span>
                   <span className="text-2xl font-bold text-violet-300 mb-1.5">/10</span>
                 </div>
 
@@ -341,10 +352,10 @@ export default function ReportPage() {
                   {(report?.overall_score || 0) >= 8
                     ? 'Rất xuất sắc'
                     : (report?.overall_score || 0) >= 6
-                    ? 'Khá tốt'
-                    : (report?.overall_score || 0) >= 4
-                    ? 'Cần cố gắng'
-                    : 'Cần nỗ lực nhiều'}
+                      ? 'Khá tốt'
+                      : (report?.overall_score || 0) >= 4
+                        ? 'Cần cố gắng'
+                        : 'Cần nỗ lực nhiều'}
                 </div>
               </motion.div>
 
@@ -360,13 +371,13 @@ export default function ReportPage() {
                   </div>
                   <div className="relative z-10 flex flex-col gap-4 mb-4">
                     <div>
-                    <motion.div 
-                      animate={{ y: [0, -6, 0] }} 
-                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} 
-                      className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-3 shadow-inner"
-                    >
+                      <motion.div
+                        animate={{ y: [0, -6, 0] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                        className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-3 shadow-inner"
+                      >
                         <SparklesIcon className="w-5 h-5 stroke-[2.5]" />
-                    </motion.div>
+                      </motion.div>
                       <h3 className="text-lg font-bold text-slate-800 mb-1">Cải thiện CV</h3>
                       <p className="text-sm font-medium text-slate-600">
                         AI đã tìm thấy {report?.cv_suggestions?.length || 0} điểm có thể nâng cấp trong CV của bạn so với Job
@@ -412,9 +423,9 @@ export default function ReportPage() {
                 className="h-full flex flex-col bg-white/80 backdrop-blur-xl rounded-3xl p-6 border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.04)]"
               >
                 <h3 className="text-lg font-extrabold text-slate-800 mb-6 flex items-center gap-2">
-              <motion.div animate={{ scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
-                <ChartBarIcon className="w-5 h-5 text-violet-500 stroke-[2.5]" />
-              </motion.div>
+                  <motion.div animate={{ scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
+                    <ChartBarIcon className="w-5 h-5 text-violet-500 stroke-[2.5]" />
+                  </motion.div>
                   Phân tích 4 tiêu chí
                 </h3>
                 <div className="flex-1 min-h-[300px] w-full -ml-2">
@@ -449,7 +460,7 @@ export default function ReportPage() {
             className="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.03)] relative overflow-hidden"
           >
             <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-violet-500 to-indigo-500"></div>
-        <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-amber-100/50 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-amber-100/50 rounded-full blur-3xl pointer-events-none"></div>
             <h2 className="text-xl font-extrabold text-slate-800 mb-4 flex items-center gap-2">
               <LightBulbIcon className="w-6 h-6 text-amber-500 stroke-[2.5]" />
               Tổng nhận xét của AI
@@ -473,23 +484,21 @@ export default function ReportPage() {
                   <button
                     key={i}
                     onClick={() => setSelectedQuestionIndex(i)}
-                    className={`w-full text-left p-3.5 rounded-xl border transition-all duration-200 flex flex-col gap-1.5 hover:-translate-y-0.5 ${
-                      selectedQuestionIndex === i
-                    ? 'bg-violet-50 border-violet-200 shadow-[0_4px_15px_rgba(124,58,237,0.08)] ring-1 ring-violet-500/10'
+                    className={`w-full text-left p-3.5 rounded-xl border transition-all duration-200 flex flex-col gap-1.5 hover:-translate-y-0.5 ${selectedQuestionIndex === i
+                        ? 'bg-violet-50 border-violet-200 shadow-[0_4px_15px_rgba(124,58,237,0.08)] ring-1 ring-violet-500/10'
                         : 'bg-white border-slate-100 hover:border-violet-100 hover:bg-slate-50 hover:shadow-sm'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between w-full">
-                  <div className={`font-bold text-sm flex items-center gap-2 ${selectedQuestionIndex === i ? 'text-violet-700' : 'text-slate-700'}`}>
-                    {selectedQuestionIndex === i && (
-                      <motion.div layoutId="questionDot" className="w-1.5 h-1.5 rounded-full bg-violet-600" />
-                    )}
-                    Câu {i + 1}
-                  </div>
+                      <div className={`font-bold text-sm flex items-center gap-2 ${selectedQuestionIndex === i ? 'text-violet-700' : 'text-slate-700'}`}>
+                        {selectedQuestionIndex === i && (
+                          <motion.div layoutId="questionDot" className="w-1.5 h-1.5 rounded-full bg-violet-600" />
+                        )}
+                        Câu {i + 1}
+                      </div>
                       <span
-                        className={`text-sm font-black bg-white px-2.5 py-0.5 rounded-md shadow-sm border border-slate-100 ${
-                          (ev.score_overall || 0) >= 8 ? 'text-emerald-600' : (ev.score_overall || 0) >= 5 ? 'text-amber-500' : 'text-red-500'
-                        }`}
+                        className={`text-sm font-black bg-white px-2.5 py-0.5 rounded-md shadow-sm border border-slate-100 ${(ev.score_overall || 0) >= 8 ? 'text-emerald-600' : (ev.score_overall || 0) >= 5 ? 'text-amber-500' : 'text-red-500'
+                          }`}
                       >
                         {(ev.score_overall || 0).toFixed(1)}
                       </span>
@@ -502,105 +511,129 @@ export default function ReportPage() {
               {/* Right Column (75%): Selected Question Details */}
               <div className="md:col-span-3 bg-white rounded-3xl border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.03)] overflow-hidden">
                 <AnimatePresence mode="wait">
-                {(() => {
-                  const ev = (report?.evaluations || [])[selectedQuestionIndex];
-                  if (!ev) return null;
-                  
-                  return (
-                    <motion.div
-                      key={selectedQuestionIndex} // Trigger animation when index changes
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      transition={{ duration: 0.4, type: "spring", bounce: 0.3 }}
-                      className="p-5 md:p-6 lg:p-8"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-5 mb-6">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-3">
-                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-violet-100 text-violet-700 text-sm font-bold shrink-0 shadow-inner">
-                              {selectedQuestionIndex + 1}
-                            </span>
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 shadow-sm">
-                              {ev.category}
-                            </span>
+                  {(() => {
+                    const ev = (report?.evaluations || [])[selectedQuestionIndex];
+                    if (!ev) return null;
+
+                    return (
+                      <motion.div
+                        key={selectedQuestionIndex} // Trigger animation when index changes
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.4, type: "spring", bounce: 0.3 }}
+                        className="p-5 md:p-6 lg:p-8"
+                      >
+                        {(() => {
+                          const candMsg = messages.find(m => m.question_id === ev.question_id && m.role === 'candidate');
+                          const candText = candMsg ? candMsg.content : (ev.candidate_answer || "");
+                          
+                          return (
+                            <>
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-5 mb-6">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-violet-100 text-violet-700 text-sm font-bold shrink-0 shadow-inner">
+                                {selectedQuestionIndex + 1}
+                              </span>
+                              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 shadow-sm">
+                                {ev.category}
+                              </span>
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-800 leading-relaxed">{ev.question_text}</h3>
                           </div>
-                          <h3 className="text-lg font-bold text-slate-800 leading-relaxed">{ev.question_text}</h3>
-                        </div>
-                        <div className="shrink-0 flex flex-col items-center justify-center bg-slate-50 px-4 py-2.5 rounded-2xl border border-slate-100 shadow-inner">
-                          <span className="text-xs font-bold text-slate-400 uppercase mb-0.5 tracking-wider">Điểm</span>
-                          <span
-                            className={`text-2xl font-black ${
-                              (ev.score_overall || 0) >= 8 ? 'text-emerald-600' : (ev.score_overall || 0) >= 5 ? 'text-amber-500' : 'text-red-500'
-                            }`}
-                          >
-                            {(ev.score_overall || 0).toFixed(1)}
-                          </span>
-                        </div>
-                      </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {ev.answer_duration_ms ? (
+                                <div className="flex flex-col items-center justify-center bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 shadow-inner">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thời gian</span>
+                                  <span className="text-sm font-bold text-slate-700">{formatDurationText(ev.answer_duration_ms)}</span>
+                                </div>
+                              ) : null}
+                              <div className="flex flex-col items-center justify-center bg-slate-50 px-4 py-2.5 rounded-2xl border border-slate-100 shadow-inner">
+                                <span className="text-xs font-bold text-slate-400 uppercase mb-0.5 tracking-wider">Điểm</span>
+                                <span
+                                  className={`text-2xl font-black ${(ev.score_overall || 0) >= 8 ? 'text-emerald-600' : (ev.score_overall || 0) >= 5 ? 'text-amber-500' : 'text-red-500'
+                                    }`}
+                                >
+                                  {(ev.score_overall || 0).toFixed(1)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
 
-                      <div className="bg-slate-50/70 rounded-2xl p-5 border border-slate-100 text-sm text-slate-600 font-medium mb-5 shadow-inner">
-                        <strong className="text-slate-800 flex items-center gap-2 mb-2 text-base">
-                          <DocumentTextIcon className="w-5 h-5 text-slate-400" />
-                          Nhận xét chi tiết
-                        </strong>
-                        <div className="leading-relaxed whitespace-pre-wrap">{ev.feedback}</div>
-                      </div>
-
-                      {/* Speech Analytics Box */}
-                      {(() => {
-                        const candMsg = messages.find(m => m.question_id === ev.question_id && m.role === 'candidate');
-                        const candText = candMsg ? candMsg.content : "";
-                        if (!candText) return null;
-                        
-                        const analysis = analyzeSpeech(candText, session?.language || "vi");
-                        if (!analysis) return null;
-
-                        return (
-                          <div className="bg-gradient-to-br from-slate-50 to-indigo-50/20 rounded-2xl p-5 border border-slate-100 text-sm text-slate-600 font-medium mb-5 shadow-inner">
-                            <strong className="text-slate-800 flex items-center gap-2 mb-3 text-base">
-                              <SparklesIcon className="w-5 h-5 text-violet-500" />
-                              Phân tích phát âm & diễn đạt (AI Speech Insights)
+                        {candText && (
+                          <div className="bg-slate-50/70 rounded-2xl p-5 border border-slate-100 text-sm text-slate-600 font-medium mb-5 shadow-inner">
+                            <strong className="text-slate-800 flex items-center gap-2 mb-2 text-base">
+                              <ChatBubbleLeftRightIcon className="w-5 h-5 text-indigo-500" />
+                              Câu trả lời của bạn
                             </strong>
-                            
-                            <div className="bg-white/80 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 italic mb-4 leading-relaxed max-h-[80px] overflow-y-auto">
-                              "{candText}"
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="bg-white p-3 rounded-xl border border-slate-100/50 shadow-sm flex flex-col justify-center">
-                                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Tốc độ nói ước tính</span>
-                                <span className="text-base font-black text-slate-800">{analysis.wpm} từ/phút</span>
-                                <span className="text-[10px] text-slate-500 mt-1 font-semibold leading-relaxed">{analysis.paceFeedback}</span>
-                              </div>
-                              <div className="bg-white p-3 rounded-xl border border-slate-100/50 shadow-sm flex flex-col justify-center">
-                                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Tần suất từ thừa (ừm, ờ...)</span>
-                                <span className="text-base font-black text-slate-800">{analysis.fillerCount} lần</span>
-                                <span className="text-[10px] text-slate-500 mt-1 font-semibold leading-relaxed">{analysis.fillerFeedback}</span>
-                              </div>
-                            </div>
+                            <div className="leading-relaxed whitespace-pre-wrap">{candText}</div>
                           </div>
-                        );
-                      })()}
+                        )}
 
-                      {ev.sample_answer && (
-                        <div className="bg-emerald-50/60 rounded-2xl p-5 border border-emerald-100 shadow-sm relative overflow-hidden group mt-2">
-                          <div className="absolute top-0 right-0 p-3 opacity-[0.05] group-hover:scale-125 group-hover:rotate-12 transition-transform duration-500">
-                            <SparklesIcon className="w-20 h-20 text-emerald-600" />
-                          </div>
-                          <strong className="flex items-center gap-1.5 text-emerald-800 mb-3 font-bold text-base relative z-10">
-                            <CheckCircleIcon className="w-5 h-5 stroke-[2.5]" />
-                            Câu trả lời mẫu xuất sắc
+                        <div className="bg-slate-50/70 rounded-2xl p-5 border border-slate-100 text-sm text-slate-600 font-medium mb-5 shadow-inner">
+                          <strong className="text-slate-800 flex items-center gap-2 mb-2 text-base">
+                            <DocumentTextIcon className="w-5 h-5 text-slate-400" />
+                            Nhận xét chi tiết
                           </strong>
-                          <div className="text-slate-700 font-medium leading-relaxed relative z-10 bg-white/70 p-4 rounded-xl shadow-sm border border-emerald-50/50">
-                            {ev.sample_answer}
-                          </div>
+                          <div className="leading-relaxed whitespace-pre-wrap">{ev.feedback}</div>
                         </div>
-                      )}
-                    </motion.div>
-                  );
-                })()}
-            </AnimatePresence>
+
+                        {/* Speech Analytics Box */}
+                        {(() => {
+                          if (!candText) return null;
+
+                          const analysis = analyzeSpeech(candText, session?.language || "vi");
+                          if (!analysis) return null;
+
+                          return (
+                            <div className="bg-gradient-to-br from-slate-50 to-indigo-50/20 rounded-2xl p-5 border border-slate-100 text-sm text-slate-600 font-medium mb-5 shadow-inner">
+                              <strong className="text-slate-800 flex items-center gap-2 mb-3 text-base">
+                                <SparklesIcon className="w-5 h-5 text-violet-500" />
+                                Phân tích phát âm & diễn đạt (AI Speech Insights)
+                              </strong>
+
+                              <div className="bg-white/80 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 italic mb-4 leading-relaxed max-h-[80px] overflow-y-auto">
+                                "{candText}"
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white p-3 rounded-xl border border-slate-100/50 shadow-sm flex flex-col justify-center">
+                                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Tốc độ nói ước tính</span>
+                                  <span className="text-base font-black text-slate-800">{analysis.wpm} từ/phút</span>
+                                  <span className="text-[10px] text-slate-500 mt-1 font-semibold leading-relaxed">{analysis.paceFeedback}</span>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-slate-100/50 shadow-sm flex flex-col justify-center">
+                                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Tần suất từ thừa (ừm, ờ...)</span>
+                                  <span className="text-base font-black text-slate-800">{analysis.fillerCount} lần</span>
+                                  <span className="text-[10px] text-slate-500 mt-1 font-semibold leading-relaxed">{analysis.fillerFeedback}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {ev.sample_answer && (
+                          <div className="bg-emerald-50/60 rounded-2xl p-5 border border-emerald-100 shadow-sm relative overflow-hidden group mt-2">
+                            <div className="absolute top-0 right-0 p-3 opacity-[0.05] group-hover:scale-125 group-hover:rotate-12 transition-transform duration-500">
+                              <SparklesIcon className="w-20 h-20 text-emerald-600" />
+                            </div>
+                            <strong className="flex items-center gap-1.5 text-emerald-800 mb-3 font-bold text-base relative z-10">
+                              <CheckCircleIcon className="w-5 h-5 stroke-[2.5]" />
+                              Câu trả lời mẫu xuất sắc
+                            </strong>
+                            <div className="text-slate-700 font-medium leading-relaxed relative z-10 bg-white/70 p-4 rounded-xl shadow-sm border border-emerald-50/50">
+                              {ev.sample_answer}
+                            </div>
+                          </div>
+                        )}
+                        </>
+                      );
+                    })()}
+                  </motion.div>
+                    );
+                  })()}
+                </AnimatePresence>
               </div>
             </div>
           </motion.div>
