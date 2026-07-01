@@ -44,6 +44,7 @@ async def generate_questions(
     industry: str | None,
     language: str,
     jd_text: str | None = None,
+    feedback: str | None = None,
 ) -> list[dict[str, Any]]:
     settings = get_settings()
     template = _load_prompt("question_generator.txt")
@@ -51,9 +52,15 @@ async def generate_questions(
 
     # Truyền cả profile (đã parse) lẫn JD thô để câu hỏi bám sát yêu cầu công việc.
     jd_block = f"\n\nJob Description (raw):\n{jd_text[:4000]}" if jd_text else "\n\nJob Description: (không có)"
+    # Phản hồi từ QA (Question Critic) ở vòng trước — yêu cầu khắc phục khi sinh lại.
+    fb_block = (
+        f"\n\nPHẢN HỒI TỪ HỘI ĐỒNG (vòng trước) — HÃY KHẮC PHỤC:\n{feedback}"
+        if feedback
+        else ""
+    )
     user_prompt = f"""Candidate Profile (parsed JSON):
 {json.dumps(profile, ensure_ascii=False)[:10000]}
-{jd_block}
+{jd_block}{fb_block}
 """
 
     data, provider = await llm_router.generate_json(

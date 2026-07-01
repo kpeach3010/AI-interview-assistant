@@ -84,6 +84,29 @@ class DatabaseService:
     def update_session_duration(self, session_id: str, duration_ms: int) -> dict:
         return self._table("interview_sessions").update({"total_duration_ms": duration_ms}).eq("id", session_id).execute().data[0]
 
+    def get_panel_state(self, session_id: str) -> dict | None:
+        """Đọc blackboard 'hội đồng phỏng vấn' (JSON) của phiên. None nếu chưa có."""
+        result = (
+            self._table("interview_sessions")
+            .select("panel_state")
+            .eq("id", session_id)
+            .execute()
+        )
+        if not result.data:
+            return None
+        state = result.data[0].get("panel_state")
+        return state if isinstance(state, dict) else None
+
+    def save_panel_state(self, session_id: str, state: dict) -> dict:
+        """Ghi đè blackboard của phiên."""
+        return (
+            self._table("interview_sessions")
+            .update({"panel_state": state})
+            .eq("id", session_id)
+            .execute()
+            .data[0]
+        )
+
     def list_sessions(self, user_id: str) -> list[dict]:
         return (
             self._table("interview_sessions")

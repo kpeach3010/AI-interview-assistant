@@ -81,6 +81,13 @@ async def evaluate_session(session_id: str) -> dict[str, Any]:
         if qid:
             answers_by_question[qid] = msg["content"]
 
+    # Chế độ hội đồng: Lead có thể bỏ qua một số câu trong kho -> chỉ chấm những
+    # câu ĐÃ được hỏi (có câu trả lời), tránh kéo điểm xuống vì câu chưa dùng.
+    if get_settings().panel_enabled:
+        answered = [q for q in all_questions if q["id"] in answers_by_question]
+        if answered:
+            all_questions = answered
+
     system_template = _load_prompt("evaluator.txt")
     system = system_template.format(language=session.get("language", "vi"))
 

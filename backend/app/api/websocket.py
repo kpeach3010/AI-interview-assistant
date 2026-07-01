@@ -10,7 +10,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.agents.interview_agent import decide_next_action, get_opening_question
 from app.core.auth import verify_supabase_token
 from app.core.database import db
-from app.services.stt import transcribe_audio_base64_async
+from app.services.stt import transcribe_audio_base64_conf_async
 from app.services.supabase_storage import storage_service
 from app.services.tts import peek_cache, synthesize_speech
 
@@ -32,6 +32,51 @@ def _next_sequence(session_id: str) -> int:
     return (last["sequence_number"] + 1) if last else 0
 
 
+# Số thuật ngữ tối đa nhồi vào initial prompt của STT (giới hạn token của Whisper).
+_MAX_GLOSSARY_TERMS = 40
+
+
+def _collect_stt_glossary(session_id: str) -> str:
+    """Gom thuật ngữ kỹ thuật (skills, tech-stack, tên dự án, keyword JD) từ hồ sơ
+    ứng viên để mớm cho Whisper -> phiên âm ĐÚNG CHÍNH TẢ thuật ngữ tiếng Anh khi
+    ứng viên nói xen kẽ Việt–Anh. Trả chuỗi rỗng nếu chưa có hồ sơ."""
+    try:
+        prof = db.get_candidate_profile(session_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Collect glossary failed: %s", exc)
+        return ""
+    if not prof:
+        return ""
+
+    raw: list = []
+    for s in prof.get("skills") or []:
+        raw.append(s.get("name") if isinstance(s, dict) else s)
+    for p in prof.get("projects") or []:
+        if isinstance(p, dict):
+            raw.append(p.get("name"))
+            raw.extend(p.get("tech_stack") or [])
+    jd = prof.get("jd_gap_analysis") or {}
+    if isinstance(jd, dict):
+        raw.extend(jd.get("matched_skills") or [])
+        raw.extend(jd.get("missing_keywords") or [])
+
+    seen: set[str] = set()
+    terms: list[str] = []
+    for item in raw:
+        term = str(item or "").strip()
+        # Chỉ giữ thuật ngữ có chữ cái ASCII (tiếng Anh/công nghệ), bỏ chuỗi quá dài.
+        if not term or len(term) > 30 or not any(c.isascii() and c.isalpha() for c in term):
+            continue
+        key = term.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        terms.append(term)
+        if len(terms) >= _MAX_GLOSSARY_TERMS:
+            break
+    return ", ".join(terms)
+
+
 async def _send_interviewer_stream(
     websocket: WebSocket,
     text: str,
@@ -42,6 +87,7 @@ async def _send_interviewer_stream(
     question_id: str | None = None,
     question_index: int | None = None,
     total_questions: int | None = None,
+    panelist: str | None = None,
 ) -> None:
     """Gửi một lượt phản hồi của AI theo kiểu streaming:
     1) Gửi TEXT ngay (người dùng thấy chữ tức thì, không chờ audio).
@@ -58,6 +104,7 @@ async def _send_interviewer_stream(
         "question_id": question_id,
         "question_index": question_index,
         "total_questions": total_questions,
+        "panelist": panelist,
         "done": False,
     })
 
@@ -149,6 +196,7 @@ async def _emit_action(
         question_id=action.get("question_id"),
         question_index=action.get("question_index"),
         total_questions=action.get("total_questions"),
+        panelist=action.get("panelist"),
     )
     if action.get("question_index") is not None:
         _spawn_prefetch(session_id, action["question_index"], language, voice)
@@ -204,6 +252,9 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
 
     language = session.get("language", "vi")
     voice = websocket.query_params.get("voice", "vi-VN-HoaiMyNeural")
+    # Kho thuật ngữ để mớm cho STT (tính 1 lần/phiên), giúp phiên âm đúng khi nói
+    # xen kẽ Việt–Anh.
+    stt_glossary = _collect_stt_glossary(session_id)
 
     try:
         messages = db.list_messages(session_id)
@@ -236,6 +287,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 question_id=opening["question_id"],
                 question_index=opening["question_index"],
                 total_questions=opening["total_questions"],
+                panelist=opening.get("panelist"),
             )
             # Prefetch audio câu hỏi chính kế tiếp.
             _spawn_prefetch(session_id, opening["question_index"], language, voice)
@@ -297,7 +349,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 audio_b64 = data.get("audio_base64", "")
                 question_id = data.get("question_id")
 
-                transcript = await transcribe_audio_base64_async(audio_b64, language)
+                transcript, low_confidence = await transcribe_audio_base64_conf_async(audio_b64, language, stt_glossary)
                 t_stt = time.perf_counter()
                 if not transcript:
                     await websocket.send_json({"type": "transcript", "text": "", "final": False})
@@ -311,7 +363,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
                 _save_message(session_id, "candidate", "answer", transcript, question_id, audio_path)
                 await websocket.send_json({"type": "transcript", "text": transcript, "final": True})
 
-                action = await decide_next_action(session_id, transcript, language)
+                action = await decide_next_action(session_id, transcript, language, low_confidence)
                 t_llm = time.perf_counter()
                 done = await _emit_action(websocket, session_id, action, language, voice)
                 t_end = time.perf_counter()
@@ -328,7 +380,7 @@ async def interview_websocket(websocket: WebSocket, session_id: str):
             elif msg_type == "transcribe_audio":
                 # Luồng THỦ CÔNG (review): chỉ trả transcript để người dùng xem lại.
                 audio_b64 = data.get("audio_base64", "")
-                transcript = await transcribe_audio_base64_async(audio_b64, language)
+                transcript, _ = await transcribe_audio_base64_conf_async(audio_b64, language, stt_glossary)
 
                 # Tải file âm thanh lên Supabase (nền) để lưu làm bằng chứng ghi âm
                 audio_bytes = base64.b64decode(audio_b64)

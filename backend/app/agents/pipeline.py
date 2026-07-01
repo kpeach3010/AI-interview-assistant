@@ -2,7 +2,9 @@ import logging
 
 from app.agents.document_parser_agent import parse_documents
 from app.agents.evaluator_agent import evaluate_session
+from app.agents.graph import eval_graph, question_graph
 from app.agents.question_generator_agent import generate_questions
+from app.core.config import get_settings
 from app.core.database import db
 from app.services.document_parser import extract_text_from_bytes
 from app.services.supabase_storage import storage_service
@@ -74,14 +76,30 @@ async def run_document_pipeline(session_id: str) -> None:
                 session.get("industry"),
             )
 
-        await generate_questions(
-            session_id,
-            profile,
-            session["position_applied"],
-            session.get("industry"),
-            session.get("language", "vi"),
-            jd_text=jd_text,
-        )
+        if get_settings().panel_enabled:
+            # Question crew (LangGraph): sinh câu hỏi -> QA phản biện -> (lặp) ->
+            # lập bảng mục tiêu (goals) cho hội đồng.
+            await question_graph().ainvoke(
+                {
+                    "session_id": session_id,
+                    "profile": profile,
+                    "position": session["position_applied"],
+                    "industry": session.get("industry"),
+                    "language": session.get("language", "vi"),
+                    "jd_text": jd_text,
+                    "qgen_iteration": 0,
+                    "critique": None,
+                }
+            )
+        else:
+            await generate_questions(
+                session_id,
+                profile,
+                session["position_applied"],
+                session.get("industry"),
+                session.get("language", "vi"),
+                jd_text=jd_text,
+            )
 
         title_prefix = "Phỏng vấn" if session.get("language") == "vi" else "Interview"
         db.update_session(
@@ -97,6 +115,10 @@ async def run_document_pipeline(session_id: str) -> None:
 async def run_evaluation_pipeline(session_id: str) -> dict:
     db.update_session(session_id, {"status": "evaluating"})
     try:
+        if get_settings().panel_enabled:
+            # Eval crew (LangGraph): chấm điểm -> soát báo cáo (self-critique).
+            state = await eval_graph().ainvoke({"session_id": session_id, "result": None})
+            return state.get("result") or {}
         return await evaluate_session(session_id)
     except Exception as exc:
         db.update_session(session_id, {"status": "failed", "error_message": str(exc)})

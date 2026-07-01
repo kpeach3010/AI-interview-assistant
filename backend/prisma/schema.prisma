@@ -132,6 +132,7 @@ model InterviewSession {
   jdDocumentId         String?       @map("jd_document_id") @db.Uuid
   currentQuestionIndex Int           @default(0) @map("current_question_index")
   followUpCount        Int           @default(0) @map("follow_up_count")
+  panelState           Json?         @map("panel_state")
   startedAt            DateTime?     @map("started_at") @db.Timestamptz(6)
   completedAt          DateTime?     @map("completed_at") @db.Timestamptz(6)
   errorMessage         String?       @map("error_message")
