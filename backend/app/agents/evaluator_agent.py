@@ -13,7 +13,7 @@ _EVAL_CONCURRENCY = 2
 # Đánh giá một câu cần ít token đầu ra -> giảm để nhanh hơn.
 _EVAL_MAX_TOKENS = 700
 
-from app.agents.schemas import AnswerEvaluationData, CvSuggestion, ReportSummary
+from app.agents.schemas import AnswerEvaluationData, ReportSummary
 from app.agents.cv_reviewer_agent import review_cv
 from app.core.config import get_settings
 from app.core.database import db
@@ -39,7 +39,7 @@ def _coerce_float(value: Any, fallback: float) -> float:
     return fallback
 
 
-def _build_report_summary(data: dict[str, Any], computed_overall: float, cv_suggestions: list[CvSuggestion]) -> ReportSummary:
+def _build_report_summary(data: dict[str, Any], computed_overall: float, annotated_cv: str) -> ReportSummary:
     """Dung ReportSummary chiu loi khi LLM tra JSON sai cau truc."""
     data = data if isinstance(data, dict) else {}
 
@@ -52,7 +52,7 @@ def _build_report_summary(data: dict[str, Any], computed_overall: float, cv_sugg
             "He thong khong tao duoc tom tat chi tiet, vui long xem danh gia tung cau hoi."
         )
 
-    return ReportSummary(overall_score=overall, summary=summary_text, cv_suggestions=cv_suggestions)
+    return ReportSummary(overall_score=overall, summary=summary_text, annotated_cv_markdown=annotated_cv)
 
 
 def _weighted_overall(scores: dict[str, float]) -> float:
@@ -231,63 +231,7 @@ Criterion average scores: {json.dumps(averages)}
         language=session.get("language", "vi"),
     )
     
-    suggestions: list[CvSuggestion] = []
-    
-    # 1. Add overall CV Critique card
-    score = cv_review.get("cv_score", 0.0)
-    critique = cv_review.get("general_critique", "")
-    priority = "high" if score <= 5.0 else ("medium" if score <= 7.5 else "low")
-    
-    suggestions.append(
-        CvSuggestion(
-            section="Đánh giá tổng quan CV",
-            suggestion=f"Điểm chất lượng CV: {score}/10.\n\nNhận xét chung: {critique}",
-            priority=priority
-        )
-    )
-    
-    # 2. Add grammar & spelling issues if any
-    grammar_issues = cv_review.get("spelling_grammar_issues", [])
-    if grammar_issues:
-        issues_text = "\n".join([f"- {issue}" for issue in grammar_issues])
-        suggestions.append(
-            CvSuggestion(
-                section="Lỗi chính tả & Ngữ pháp",
-                suggestion=f"Phát hiện các lỗi chính tả, hành văn thiếu chuyên nghiệp:\n{issues_text}",
-                priority="high"
-            )
-        )
-
-    # 2b. Từ khoá JD còn thiếu (ATS gap)
-    ats_missing = cv_review.get("ats_keywords_missing", [])
-    if ats_missing:
-        kw_text = ", ".join(str(k) for k in ats_missing)
-        suggestions.append(
-            CvSuggestion(
-                section="Từ khoá JD còn thiếu (ATS)",
-                suggestion=(
-                    "Các từ khoá/kỹ năng JD yêu cầu nhưng CV chưa thể hiện rõ. "
-                    f"Bổ sung nếu bạn thực sự có: {kw_text}"
-                ),
-                priority="high",
-            )
-        )
-
-    # 3. Add other detailed suggestions (kèm bằng chứng + Before/After thật từ LLM)
-    for item in cv_review.get("cv_suggestions", []):
-        if isinstance(item, dict) and item.get("suggestion"):
-            suggestions.append(
-                CvSuggestion(
-                    section=str(item.get("section", "Chung")),
-                    suggestion=str(item["suggestion"]),
-                    priority=str(item.get("priority", "medium")),
-                    evidence=item.get("evidence"),
-                    before=item.get("before"),
-                    after=item.get("after"),
-                )
-            )
-
-    report_summary = _build_report_summary(summary_data, overall_score, suggestions)
+    report_summary = _build_report_summary(summary_data, overall_score, cv_review.get("annotated_cv_markdown", ""))
 
     eval_list_for_pdf = [
         {
@@ -308,7 +252,7 @@ Criterion average scores: {json.dumps(averages)}
             averages,
             report_summary.summary,
             eval_list_for_pdf,
-            [s.model_dump() for s in report_summary.cv_suggestions],
+            [],
         )
         candidate_path = f"{session['user_id']}/{session_id}/report.pdf"
         storage_service.upload_file("reports", candidate_path, pdf_bytes, "application/pdf")
@@ -326,7 +270,7 @@ Criterion average scores: {json.dumps(averages)}
             "avg_completeness": averages["completeness"],
             "avg_presentation": averages["presentation"],
             "summary": report_summary.summary,
-            "cv_suggestions": [s.model_dump() for s in report_summary.cv_suggestions],
+            "cv_suggestions": [{"annotated_cv_markdown": report_summary.annotated_cv_markdown}],
             "pdf_bucket": pdf_bucket,
             "pdf_path": pdf_path,
         },
@@ -341,6 +285,7 @@ Criterion average scores: {json.dumps(averages)}
         "overall_score": overall_score,
         "averages": averages,
         "summary": report_summary.summary,
-        "cv_suggestions": [s.model_dump() for s in report_summary.cv_suggestions],
+        "cv_suggestions": [],
+        "annotated_cv_markdown": report_summary.annotated_cv_markdown,
         "evaluations_count": len(evaluations),
     }

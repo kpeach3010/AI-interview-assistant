@@ -24,6 +24,9 @@ class Settings(BaseSettings):
 
     groq_api_key: str = ""
     groq_model: str = "llama-3.1-8b-instant"
+
+    cerebras_api_key: str = ""
+    cerebras_model: str = "gemma-4-31b"
     # Model mạnh hơn cho tác vụ nền cần chất lượng cao (sinh câu hỏi, review CV,
     # parse CV, summarizer). Không dùng cho phần phỏng vấn real-time.
     groq_quality_model: str = "llama-3.3-70b-versatile"

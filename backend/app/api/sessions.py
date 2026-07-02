@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
-
 from app.services.pdf_resume import generate_resume_pdf
+from app.services.supabase_storage import storage_service
 from app.agents.pipeline import run_document_pipeline, run_evaluation_pipeline
 from app.api.schemas import (
     CreateSessionRequest,
@@ -43,6 +43,17 @@ def _session_to_response(s: dict) -> SessionResponse:
         avg_completeness = float(rep["avg_completeness"]) if rep.get("avg_completeness") is not None else None
         avg_presentation = float(rep["avg_presentation"]) if rep.get("avg_presentation") is not None else None
 
+    cv_url = None
+    if s.get("cvDocument"):
+        cv_doc = s["cvDocument"]
+        bucket = cv_doc.get("storage_bucket")
+        path = cv_doc.get("storage_path")
+        if bucket and path:
+            try:
+                cv_url = storage_service.get_public_url(bucket, path)
+            except Exception as e:
+                logger.error(f"Failed to generate cv_url: {e}")
+
     return SessionResponse(
         id=s["id"],
         title=s.get("title"),
@@ -58,6 +69,7 @@ def _session_to_response(s: dict) -> SessionResponse:
         avg_relevance=avg_relevance,
         avg_completeness=avg_completeness,
         avg_presentation=avg_presentation,
+        cv_url=cv_url,
     )
 
 
@@ -95,7 +107,7 @@ async def create_session(
     )
 
     # Chạy pipeline bất đồng bộ qua background tasks để tránh nghẽn luồng HTTP
-    background_tasks.add_task(run_document_pipeline, session["id"])
+    background_tasks.add_task(run_document_pipeline, session["id"], optimize_only=body.optimize_only)
 
     return _session_to_response(session)
 

@@ -153,6 +153,25 @@ class GeneratedQuestion(BaseModel):
 class QuestionList(BaseModel):
     questions: list[GeneratedQuestion]
 
+    @field_validator("questions", mode="before")
+    @classmethod
+    def _normalize_questions(cls, value: Any) -> Any:
+        if isinstance(value, list):
+            new_list = []
+            for item in value:
+                # Handle cases where the LLM returns a list instead of a dict
+                # e.g., ["screening", "question text"]
+                if isinstance(item, list) and len(item) >= 2:
+                    new_list.append({
+                        "category": str(item[0]),
+                        "question_text": str(item[1]),
+                        "order_index": 0
+                    })
+                else:
+                    new_list.append(item)
+            return new_list
+        return value
+
 
 class AnswerEvaluationData(BaseModel):
     score_content: float
@@ -165,21 +184,10 @@ class AnswerEvaluationData(BaseModel):
     sample_answer: str
 
 
-class CvSuggestion(BaseModel):
-    section: str
-    suggestion: str
-    priority: str = "medium"
-    # Bằng chứng trích từ CV và ví dụ viết lại theo công thức XYZ (do LLM tạo,
-    # gắn với CV thật — thay cho ví dụ hard-code ở frontend).
-    evidence: str | None = None
-    before: str | None = None
-    after: str | None = None
-
-
 class ReportSummary(BaseModel):
     overall_score: float
     summary: str
-    cv_suggestions: list[CvSuggestion] = Field(default_factory=list)
+    annotated_cv_markdown: str = ""
 
 
 # ---------------------------------------------------------------------------

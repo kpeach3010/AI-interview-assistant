@@ -70,9 +70,13 @@ async def generate_questions(
         model=settings.groq_quality_model,
     )
 
-    logger.info("[QuestionGenerator] provider=%s model=%s", provider, settings.groq_quality_model)
+    logger.info("[QuestionGenerator] provider=%s", provider)
 
-    result = QuestionList.model_validate(data)
+    try:
+        result = QuestionList.model_validate(data)
+    except Exception as exc:
+        logger.error("[QuestionGenerator] Failed to validate QuestionList: %s. Data was: %s", exc, data)
+        return []
 
     # Hậu kiểm: khử trùng lặp, đánh lại order_index liên tục.
     questions = _dedupe_questions(result.questions)

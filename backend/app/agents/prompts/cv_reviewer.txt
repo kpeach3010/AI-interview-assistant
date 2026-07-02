@@ -16,21 +16,29 @@ JD GAP: list concrete keywords/skills present in the JD but MISSING from the CV 
 
 Be direct, specific and actionable. No generic advice.
 
-Output ONLY valid JSON (no markdown, no ```):
-{{
-  "cv_score": <float 1.0-10.0>,
-  "general_critique": "<honest, specific overall critique, max 120 words>",
-  "spelling_grammar_issues": ["<specific issue, quote the wording, max 20 words>"],
-  "ats_keywords_missing": ["<JD keyword/skill missing from the CV>"],
-  "cv_suggestions": [
-    {{
-      "section": "<Work Experience | Projects | Skills | Summary | Education | Formatting>",
-      "suggestion": "<what to fix and why it matters for this role, actionable>",
-      "priority": "high|medium|low",
-      "evidence": "<exact phrase quoted from the CV that is weak>",
-      "before": "<the current weak bullet, as written in the CV>",
-      "after": "<rewritten bullet using the XYZ formula, specific & quantified>"
-    }}
-  ]
-}}
+Output format MUST be EXACTLY as follows (DO NOT output JSON):
+<score>
+[Float 1.0-10.0]
+</score>
+<critique>
+[honest, specific overall critique, max 120 words]
+</critique>
+<spelling_issues>
+[List of specific issues, one per line, starting with -]
+</spelling_issues>
+<ats_missing>
+[List of JD keywords missing, one per line, starting with -]
+</ats_missing>
+<suggestions>
+[Output EXACTLY 5 to 8 `<suggestion>` blocks. CRITICAL: Even if the CV is completely mismatched or terrible, you MUST pick 5 to 8 specific sentences/bullet points from the CV that are poorly written or irrelevant, and rewrite them to show the candidate how to improve. DO NOT just give generic advice here.
+For each weak point, quote the EXACT original text, provide an improved version, and a brief explanation. 
+Wrap each suggestion exactly like this:
+<suggestion>
+<original>...</original>
+<improved>...</improved>
+<severity>high|medium|low</severity>
+<explanation>...</explanation>
+</suggestion>
+For `severity`: use "high" for critical issues, "medium" for structural, "low" for polish.]
+</suggestions>
 Response language: {language}

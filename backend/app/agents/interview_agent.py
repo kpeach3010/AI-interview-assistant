@@ -246,7 +246,12 @@ async def _legacy_decide_next_action(
         low_confidence=low_confidence,
         language=language,
     )
-    data, _ = await llm_router.generate_json(prompt, _PERSONA, max_tokens=256)
+    try:
+        data, _ = await llm_router.generate_json(prompt, _PERSONA, max_tokens=512)
+    except Exception as exc:
+        logger.error("Failed to parse JSON from LLM in decide_next_action: %s", exc)
+        data = {"answer_quality": "partial", "action": "advance", "text": ""}
+
     quality = str(data.get("answer_quality", "partial")).strip().lower()
     proposed = str(data.get("action", "advance")).strip().lower()
     text = (data.get("text") or "").strip()

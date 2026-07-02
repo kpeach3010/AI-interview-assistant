@@ -21,7 +21,7 @@ def _sanitize_text(text: str) -> str:
     return text.replace("\x00", "").strip()
 
 
-async def run_document_pipeline(session_id: str) -> None:
+async def run_document_pipeline(session_id: str, optimize_only: bool = False) -> None:
     session = db.get_session_with_docs(session_id)
     if not session:
         raise ValueError("Session not found")
@@ -76,36 +76,80 @@ async def run_document_pipeline(session_id: str) -> None:
                 session.get("industry"),
             )
 
-        if get_settings().panel_enabled:
-            # Question crew (LangGraph): sinh câu hỏi -> QA phản biện -> (lặp) ->
-            # lập bảng mục tiêu (goals) cho hội đồng.
-            await question_graph().ainvoke(
-                {
-                    "session_id": session_id,
-                    "profile": profile,
-                    "position": session["position_applied"],
-                    "industry": session.get("industry"),
-                    "language": session.get("language", "vi"),
-                    "jd_text": jd_text,
-                    "qgen_iteration": 0,
-                    "critique": None,
-                }
-            )
-        else:
-            await generate_questions(
-                session_id,
-                profile,
+        import asyncio
+        from app.agents.cv_reviewer_agent import review_cv
+
+        if optimize_only:
+            logger.info("optimize_only=True -> Skipping question generation")
+            
+            cv_review_data = await review_cv(
+                cv_text,
+                jd_text,
                 session["position_applied"],
                 session.get("industry"),
-                session.get("language", "vi"),
-                jd_text=jd_text,
+                session.get("language", "vi")
+            )
+        else:
+            if get_settings().panel_enabled:
+                # Question crew (LangGraph): sinh câu hỏi -> QA phản biện -> (lặp) ->
+                # lập bảng mục tiêu (goals) cho hội đồng.
+                question_coro = question_graph().ainvoke(
+                    {
+                        "session_id": session_id,
+                        "profile": profile,
+                        "position": session["position_applied"],
+                        "industry": session.get("industry"),
+                        "language": session.get("language", "vi"),
+                        "jd_text": jd_text,
+                        "qgen_iteration": 0,
+                        "critique": None,
+                    }
+                )
+            else:
+                question_coro = generate_questions(
+                    session_id,
+                    profile,
+                    session["position_applied"],
+                    session.get("industry"),
+                    session.get("language", "vi"),
+                    jd_text=jd_text,
+                )
+
+            review_coro = review_cv(
+                cv_text,
+                jd_text,
+                session["position_applied"],
+                session.get("industry"),
+                session.get("language", "vi")
             )
 
-        title_prefix = "Phỏng vấn" if session.get("language") == "vi" else "Interview"
-        db.update_session(
+            _, cv_review_data = await asyncio.gather(question_coro, review_coro)
+
+        # Save preliminary report for CV optimization feature
+        db.upsert_report(
             session_id,
-            {"status": "ready", "title": f"{title_prefix} {session['position_applied']}"},
+            {
+                "overall_score": float(cv_review_data.get("cv_score", 0.0)),
+                "avg_content": 0.0,
+                "avg_relevance": 0.0,
+                "avg_completeness": 0.0,
+                "avg_presentation": 0.0,
+                "summary": cv_review_data.get("general_critique", ""),
+                "cv_suggestions": [{"annotated_cv_markdown": cv_review_data.get("annotated_cv_markdown", "")}],
+            }
         )
+
+        title_prefix = "Phỏng vấn" if session.get("language") == "vi" else "Interview"
+        if optimize_only:
+            db.update_session(
+                session_id,
+                {"status": "ready", "title": f"Tối ưu CV {session['position_applied']}"},
+            )
+        else:
+            db.update_session(
+                session_id,
+                {"status": "ready", "title": f"{title_prefix} {session['position_applied']}"},
+            )
     except Exception as exc:
         logger.exception("Pipeline failed for session %s", session_id)
         db.update_session(session_id, {"status": "failed", "error_message": str(exc)})

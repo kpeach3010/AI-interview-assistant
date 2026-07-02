@@ -38,6 +38,9 @@ class StorageService:
         result = self.client.storage.from_(bucket).create_signed_url(path, expires_in)
         return result["signedURL"]
 
+    def get_public_url(self, bucket: str, path: str) -> str:
+        return self.client.storage.from_(bucket).get_public_url(path)
+
     @staticmethod
     def build_document_path(user_id: str, doc_id: str, filename: str) -> str:
         ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"

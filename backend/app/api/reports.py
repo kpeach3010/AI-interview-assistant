@@ -36,6 +36,10 @@ async def get_report(session_id: str, user: Annotated[dict, Depends(get_current_
             pdf_url = None
 
     cv_suggestions = report.get("cv_suggestions") or []
+    annotated_cv_markdown = report.get("annotated_cv_markdown")
+    if not annotated_cv_markdown and isinstance(cv_suggestions, list) and len(cv_suggestions) > 0 and isinstance(cv_suggestions[0], dict) and "annotated_cv_markdown" in cv_suggestions[0]:
+        annotated_cv_markdown = cv_suggestions[0]["annotated_cv_markdown"]
+        cv_suggestions = []
 
     profile = db.get_candidate_profile(session_id) or {}
     jd_gap_analysis = profile.get("jd_gap_analysis") if isinstance(profile, dict) else None
@@ -52,6 +56,7 @@ async def get_report(session_id: str, user: Annotated[dict, Depends(get_current_
         avg_presentation=float(report["avg_presentation"]),
         summary=report["summary"],
         cv_suggestions=cv_suggestions if isinstance(cv_suggestions, list) else [],
+        annotated_cv_markdown=annotated_cv_markdown,
         evaluations=[
             {
                 "question_id": e["question_id"],

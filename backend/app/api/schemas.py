@@ -21,6 +21,7 @@ class CreateSessionRequest(BaseModel):
     position_applied: str
     industry: str | None = None
     language: str = "vi"
+    optimize_only: bool = False
 
 
 class SessionTimingUpdate(BaseModel):
@@ -46,6 +47,8 @@ class SessionResponse(BaseModel):
     avg_relevance: float | None = None
     avg_completeness: float | None = None
     avg_presentation: float | None = None
+    cv_url: str | None = None
+    cv_document_id: str | None = None
 
 
 class QuestionResponse(BaseModel):
@@ -65,7 +68,8 @@ class ReportResponse(BaseModel):
     avg_completeness: float
     avg_presentation: float
     summary: str
-    cv_suggestions: list
+    cv_suggestions: list | None = None
+    annotated_cv_markdown: str | None = None
     evaluations: list = Field(default_factory=list)
     pdf_url: str | None = None
     jd_gap_analysis: dict | None = None

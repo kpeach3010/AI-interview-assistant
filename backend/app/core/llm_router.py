@@ -84,6 +84,45 @@ class LLMRouter:
             resp.raise_for_status()
             return resp.json()["message"]["content"]
 
+    async def _call_cerebras(
+        self,
+        prompt: str,
+        system: str = "",
+        json_mode: bool = False,
+        max_tokens: int = 1500,
+        model: str | None = None,
+    ) -> str:
+        if not self.settings.cerebras_api_key:
+            raise RuntimeError("CEREBRAS_API_KEY is not configured")
+
+        messages: list[dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = {
+            "model": model or self.settings.cerebras_model,
+            "messages": messages,
+            "max_completion_tokens": max_tokens,
+            "temperature": 0.7,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        headers = {
+            "Authorization": f"Bearer {self.settings.cerebras_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.cerebras.ai/v1/chat/completions",
+                json=payload,
+                headers=headers
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+
     async def _call_groq(
         self,
         prompt: str,
@@ -158,6 +197,9 @@ class LLMRouter:
     def _has_groq(self) -> bool:
         return bool(self.settings.groq_api_key)
 
+    def _has_cerebras(self) -> bool:
+        return bool(self.settings.cerebras_api_key)
+
     def _has_gemini(self) -> bool:
         return bool(self.settings.gemini_api_key)
 
@@ -166,18 +208,20 @@ class LLMRouter:
         mode = prefer or self.settings.llm_prefer
 
         if mode in ("local", "ollama"):
-            return ["ollama", "groq", "gemini"]
+            return ["ollama", "cerebras", "groq", "gemini"]
         if mode == "cloud":
-            return ["groq", "gemini", "ollama"]
+            return ["cerebras", "groq", "gemini", "ollama"]
+        if mode == "cerebras":
+            return ["cerebras", "groq", "gemini", "ollama"]
         if mode == "groq":
-            return ["groq", "gemini", "ollama"]
+            return ["groq", "cerebras", "gemini", "ollama"]
         if mode == "gemini":
-            return ["gemini", "groq", "ollama"]
+            return ["gemini", "cerebras", "groq", "ollama"]
 
         # auto: prefer local if Ollama is available
         if await self._ollama_healthy():
-            return ["ollama", "groq", "gemini"]
-        return ["groq", "gemini", "ollama"]
+            return ["ollama", "cerebras", "groq", "gemini"]
+        return ["cerebras", "groq", "gemini", "ollama"]
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -212,6 +256,13 @@ class LLMRouter:
                         continue
                     logger.info("[LLMRouter] Using ollama (%s)", self.settings.ollama_model)
                     result = await self._call_ollama(prompt, system, max_tokens=max_tokens)
+
+                elif provider == "cerebras":
+                    if not self._has_cerebras():
+                        logger.debug("Cerebras API key not set, skipping.")
+                        continue
+                    logger.info("[LLMRouter] Using cerebras (%s) json_mode=%s", self.settings.cerebras_model, json_mode)
+                    result = await self._call_cerebras(prompt, system, json_mode=json_mode, max_tokens=max_tokens)
 
                 elif provider == "groq":
                     if not self._has_groq():
@@ -292,6 +343,49 @@ class LLMRouter:
 
         for provider in providers:
             try:
+                if provider == "cerebras":
+                    if not self._has_cerebras():
+                        continue
+                    messages = []
+                    if system:
+                        messages.append({"role": "system", "content": system})
+                    messages.append({"role": "user", "content": prompt})
+
+                    payload = {
+                        "model": self.settings.cerebras_model,
+                        "messages": messages,
+                        "max_completion_tokens": max_tokens,
+                        "temperature": 0.7,
+                        "stream": True,
+                    }
+                    headers = {
+                        "Authorization": f"Bearer {self.settings.cerebras_api_key}",
+                        "Content-Type": "application/json"
+                    }
+
+                    logger.info("[LLMRouter] Streaming cerebras (%s)", self.settings.cerebras_model)
+                    async with httpx.AsyncClient(timeout=60.0) as client_http:
+                        async with client_http.stream(
+                            "POST",
+                            "https://api.cerebras.ai/v1/chat/completions",
+                            json=payload,
+                            headers=headers
+                        ) as resp:
+                            resp.raise_for_status()
+                            async for line in resp.aiter_lines():
+                                line = line.strip()
+                                if not line or line == "data: [DONE]":
+                                    continue
+                                if line.startswith("data: "):
+                                    try:
+                                        obj = json.loads(line[6:])
+                                        delta = obj.get("choices", [{}])[0].get("delta", {}).get("content")
+                                        if delta:
+                                            yield delta
+                                    except Exception:
+                                        pass
+                    return
+
                 if provider == "groq":
                     if not self._has_groq():
                         continue
@@ -374,6 +468,10 @@ class LLMRouter:
                 "configured": True,
                 "base_url": self.settings.ollama_base_url,
                 "model": self.settings.ollama_model,
+            },
+            "cerebras": {
+                "configured": self._has_cerebras(),
+                "model": self.settings.cerebras_model,
             },
             "groq": {
                 "configured": self._has_groq(),

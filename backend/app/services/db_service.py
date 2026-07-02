@@ -72,7 +72,7 @@ class DatabaseService:
         return self._table("interview_sessions").insert(data).execute().data[0]
 
     def get_session(self, session_id: str, user_id: str | None = None) -> dict | None:
-        q = self._table("interview_sessions").select("*").eq("id", session_id)
+        q = self._table("interview_sessions").select("*, cvDocument:documents!cv_document_id(storage_bucket, storage_path)").eq("id", session_id)
         if user_id:
             q = q.eq("user_id", user_id)
         result = q.execute()
@@ -110,7 +110,7 @@ class DatabaseService:
     def list_sessions(self, user_id: str) -> list[dict]:
         return (
             self._table("interview_sessions")
-            .select("*, report:interview_reports(overall_score, avg_content, avg_relevance, avg_completeness, avg_presentation)")
+            .select("*, report:interview_reports(overall_score, avg_content, avg_relevance, avg_completeness, avg_presentation), cvDocument:documents!cv_document_id(storage_bucket, storage_path)")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .execute()
