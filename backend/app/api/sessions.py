@@ -70,6 +70,7 @@ def _session_to_response(s: dict) -> SessionResponse:
         avg_completeness=avg_completeness,
         avg_presentation=avg_presentation,
         cv_url=cv_url,
+        cv_document_id=s.get("cv_document_id"),
     )
 
 
@@ -349,3 +350,52 @@ async def get_original_cv_text(
         raise HTTPException(status_code=404, detail="Document not found")
         
     return {"raw_text": doc.get("raw_text") or ""}
+
+
+@router.get("/{session_id}/cv/original/file")
+async def get_cv_original_file(session_id: str, token: str = Query(...)):
+    """Proxy file CV gốc từ Supabase Storage.
+    Nhận token qua query param vì iframe không thể gửi Authorization header.
+    Trả về file với header inline để hiển thị trong iframe mà không bị X-Frame-Options chặn.
+    """
+    try:
+        user = await verify_supabase_token(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    session = db.get_session(session_id, user["sub"])
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    cv_doc = session.get("cvDocument")
+    if not cv_doc:
+        raise HTTPException(status_code=404, detail="CV document not found")
+
+    bucket = cv_doc.get("storage_bucket")
+    path = cv_doc.get("storage_path")
+    if not bucket or not path:
+        raise HTTPException(status_code=400, detail="CV storage info missing")
+
+    try:
+        file_bytes = storage_service.download_file(bucket, path)
+    except Exception as e:
+        logger.error(f"Failed to download CV file: {e}")
+        raise HTTPException(status_code=500, detail="Failed to download CV file")
+
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else "pdf"
+    mime_map = {
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "doc": "application/msword",
+        "txt": "text/plain; charset=utf-8",
+    }
+    content_type = mime_map.get(ext, "application/octet-stream")
+
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="cv.{ext}"',
+            "Cache-Control": "private, max-age=300",
+        },
+    )
