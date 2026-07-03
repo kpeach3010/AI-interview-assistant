@@ -34,6 +34,7 @@ interface SessionResponse {
   id: string;
   cv_url?: string;
   cv_document_id?: string;
+  jd_document_id?: string;
 }
 
 interface CandidateProfileData {
@@ -384,6 +385,20 @@ export default function CVSuggestionPage() {
               <ChartBarIcon className="w-5 h-5 text-purple-500" />
               Độ Khớp ATS
             </h3>
+            
+            {!session?.jd_document_id ? (
+              <div className="flex flex-col items-center justify-center h-full text-center z-10 space-y-3 pb-4">
+                <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-1">
+                  <DocumentTextIcon className="w-6 h-6 text-slate-400" />
+                </div>
+                <p className="text-sm font-medium text-slate-500">
+                  Không đánh giá ATS
+                </p>
+                <p className="text-xs text-slate-400 max-w-[200px]">
+                  Bạn chưa tải lên Mô tả công việc (JD) để đối chiếu từ khóa.
+                </p>
+              </div>
+            ) : (
             <div className="flex flex-col gap-3 z-10">
               <div className="flex justify-between items-end">
                 <span className="text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-slate-700 to-slate-900">
@@ -431,6 +446,7 @@ export default function CVSuggestionPage() {
                 </div>
               </div>
             </div>
+            )}
           </div>
           </div>
 

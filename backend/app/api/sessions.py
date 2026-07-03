@@ -71,6 +71,7 @@ def _session_to_response(s: dict) -> SessionResponse:
         avg_presentation=avg_presentation,
         cv_url=cv_url,
         cv_document_id=s.get("cv_document_id"),
+        jd_document_id=s.get("jd_document_id"),
     )
 
 

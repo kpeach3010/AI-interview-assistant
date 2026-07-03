@@ -49,6 +49,7 @@ class SessionResponse(BaseModel):
     avg_presentation: float | None = None
     cv_url: str | None = None
     cv_document_id: str | None = None
+    jd_document_id: str | None = None
 
 
 class QuestionResponse(BaseModel):

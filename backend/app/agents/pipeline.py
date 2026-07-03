@@ -87,6 +87,11 @@ async def run_document_pipeline(session_id: str, optimize_only: bool = False) ->
         if saved_profile and isinstance(saved_profile, dict) and saved_profile.get("skills"):
             logger.info("Reusing existing parsed profile for document %s in session %s", cv_doc["id"], session_id)
             profile = saved_profile
+            
+
+            if not session.get("jd_document_id"):
+                profile["jd_gap_analysis"] = {}
+
             # Copy to session's candidate_profile
             db.upsert_candidate_profile(
                 session_id,
