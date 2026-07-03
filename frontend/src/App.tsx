@@ -33,6 +33,10 @@ export default function App() {
         path="/report/:sessionId/cv-suggestions"
         element={<ProtectedPage><CVSuggestionPage /></ProtectedPage>}
       />
+      <Route
+        path="/cv-suggestion/:sessionId"
+        element={<ProtectedPage><CVSuggestionPage /></ProtectedPage>}
+      />
     </Routes>
   );
 }

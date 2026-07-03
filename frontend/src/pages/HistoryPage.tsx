@@ -92,7 +92,7 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeCriterion, setActiveCriterion] = useState(0);
-  const [activeTab, setActiveTab] = useState<"list" | "analytics">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "cv_list" | "analytics">("list");
   const navigate = useNavigate();
 
   const completedSessions = sessions.filter((s) => s.status === "completed" && s.overall_score !== undefined && s.overall_score !== null);
@@ -163,6 +163,26 @@ export default function HistoryPage() {
   const filteredSessions = sessions.filter((s) => {
     if (s.title && (s.title.startsWith("Tối ưu CV") || s.title.includes("[CV_OPT]"))) return false; // Hide CV optimization sessions
     if (s.position_applied && s.position_applied.includes("[CV_OPT]")) return false;
+    
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch =
+      (s.title || s.position_applied || "").toLowerCase().includes(searchLower) ||
+      (s.industry || "").toLowerCase().includes(searchLower);
+
+    let matchesStatus = true;
+    if (statusFilter === "completed") {
+      matchesStatus = s.status === "completed";
+    } else if (statusFilter === "processing") {
+      matchesStatus = ["draft", "parsing", "ready", "active", "evaluating"].includes(s.status);
+    }
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredCvSessions = sessions.filter((s) => {
+    const isCvOpt = (s.title && (s.title.startsWith("Tối ưu CV") || s.title.includes("[CV_OPT]"))) ||
+                    (s.position_applied && s.position_applied.includes("[CV_OPT]"));
+    if (!isCvOpt) return false;
     
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
@@ -281,6 +301,14 @@ export default function HistoryPage() {
                   <ClockIcon className="w-4 h-4" />
                   Lịch sử phỏng vấn
                 </button>
+                <button
+                  onClick={() => setActiveTab("cv_list")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${activeTab === "cv_list" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                    }`}
+                >
+                  <DocumentTextIcon className="w-4 h-4" />
+                  Lịch sử tối ưu CV
+                </button>
                 {completedCount > 0 && (
                   <button
                     onClick={() => setActiveTab("analytics")}
@@ -293,7 +321,7 @@ export default function HistoryPage() {
                 )}
               </div>
 
-              {activeTab === "list" ? (
+              {activeTab === "list" && (
                 <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-slate-200/60 shadow-[0_10px_40px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col relative z-10 animate-fade-in">
                   <div className="p-5 md:p-6 border-b border-slate-200/60 bg-white/40">
                     <div className="flex flex-col sm:flex-row gap-3 w-full">
@@ -440,7 +468,139 @@ export default function HistoryPage() {
                     )}
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {activeTab === "cv_list" && (
+                <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-slate-200/60 shadow-[0_10px_40px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col relative z-10 animate-fade-in">
+                  <div className="p-5 md:p-6 border-b border-slate-200/60 bg-white/40">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full">
+                      <div className="relative w-full flex-1 group">
+                        <div className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:bg-violet-200 group-focus-within:bg-violet-600 group-focus-within:text-white group-focus-within:scale-105 shadow-sm z-10">
+                          <MagnifyingGlassIcon className="w-5 h-5 stroke-[2.5]" />
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Tìm kiếm phiên tối ưu CV..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pl-14 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/15 bg-white/80 backdrop-blur-xl transition-all shadow-sm text-sm font-medium hover:border-violet-300"
+                        />
+                      </div>
+                      <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 shrink-0 h-[48px] items-center">
+                        <button
+                          onClick={() => setStatusFilter("all")}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "all" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                            }`}
+                        >
+                          Tất cả
+                        </button>
+                        <button
+                          onClick={() => setStatusFilter("processing")}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "processing" ? "bg-white text-amber-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                            }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${statusFilter === "processing" ? "bg-amber-500 animate-pulse" : "bg-slate-400"}`}></span>
+                          Đang xử lý
+                        </button>
+                        <button
+                          onClick={() => setStatusFilter("completed")}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "completed" ? "bg-white text-emerald-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                            }`}
+                        >
+                          <CheckCircleIcon className="w-4 h-4" />
+                          Hoàn thành
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 md:p-6 bg-slate-50/30">
+                    {filteredCvSessions.length === 0 ? (
+                      <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-sm">
+                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <DocumentTextIcon className="w-8 h-8 text-slate-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-700 mb-1">Không tìm thấy dữ liệu</h3>
+                        <p className="text-slate-500 text-sm font-medium">Thử thay đổi từ khóa hoặc bộ lọc để xem các kết quả khác.</p>
+                      </div>
+                    ) : (
+                      <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="show"
+                        className="grid gap-4 md:max-h-[600px] md:overflow-y-auto pr-2 pb-2 -mr-2"
+                        style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}
+                      >
+                        {filteredCvSessions.map((s) => {
+                          const isActionable = ["ready", "active", "completed", "evaluating"].includes(s.status);
+
+                          return (
+                            <motion.div
+                              variants={itemVariants}
+                              whileHover={{ y: -2, scale: 1.005 }}
+                              key={s.id}
+                              onClick={() => {
+                                navigate(`/report/${s.id}/cv-suggestions`);
+                              }}
+                              className={`relative bg-white rounded-2xl py-5 pr-5 pl-7 border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_30px_rgba(124,58,237,0.08)] hover:border-violet-200 transition-all duration-300 group flex flex-col md:flex-row md:items-center justify-between gap-4 overflow-hidden ${isActionable ? "cursor-pointer" : ""
+                                }`}
+                            >
+                              <div className={`absolute top-0 left-0 bottom-0 w-1.5 transition-colors ${s.status === "completed" || s.status === "ready" ? "bg-emerald-500" :
+                                  s.status === "evaluating" ? "bg-purple-500" :
+                                    s.status === "parsing" ? "bg-orange-500" :
+                                      "bg-slate-300"
+                                }`} />
+
+                              <div className="absolute inset-0 bg-gradient-to-r from-violet-50/30 to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
+
+                              <div className="flex-1 relative z-10">
+                                <div className="flex items-center gap-3 mb-2.5">
+                                  <StatusBadge status={s.status} />
+                                  <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                                    <CalendarIcon className="w-3.5 h-3.5" />
+                                    {new Date(s.created_at || Date.now()).toLocaleDateString("vi-VN", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                </div>
+
+                                <h3 className="text-lg font-extrabold text-slate-800 mb-2.5 group-hover:text-violet-700 transition-colors">
+                                  {s.title || s.position_applied || "Vị trí tối ưu không xác định"}
+                                </h3>
+
+                                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+                                  {s.industry && (
+                                    <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 shadow-sm">
+                                      <BriefcaseIcon className="w-3.5 h-3.5 text-slate-400" />
+                                      {s.industry}
+                                    </span>
+                                  )}
+                                  <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 shadow-sm">
+                                    <LanguageIcon className="w-3.5 h-3.5 text-slate-400" />
+                                    {s.language === "vi" ? "Tiếng Việt" : "English"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 flex items-center gap-3 mt-2 md:mt-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-100 relative z-10">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 px-3.5 py-2 rounded-lg group-hover:bg-gradient-to-r group-hover:from-violet-600 group-hover:to-indigo-600 group-hover:text-white transition-all shadow-sm hover:shadow-md">
+                                  Xem kết quả tối ưu <SparklesIcon className="w-3.5 h-3.5" />
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "analytics" && (
                 <motion.div
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}

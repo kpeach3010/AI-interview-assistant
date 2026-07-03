@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, Query
 from app.services.pdf_resume import generate_resume_pdf
 from app.services.supabase_storage import storage_service
 from app.agents.pipeline import run_document_pipeline, run_evaluation_pipeline
@@ -13,7 +13,7 @@ from app.api.schemas import (
     SessionTimingUpdate,
     QuestionTimingUpdate,
 )
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, verify_supabase_token
 from app.core.database import db
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ def _session_to_response(s: dict) -> SessionResponse:
         path = cv_doc.get("storage_path")
         if bucket and path:
             try:
-                cv_url = storage_service.get_public_url(bucket, path)
+                cv_url = storage_service.get_signed_url(bucket, path, expires_in=3600)
             except Exception as e:
                 logger.error(f"Failed to generate cv_url: {e}")
 
@@ -286,3 +286,66 @@ async def get_cv_pdf(session_id: str, user: Annotated[dict, Depends(get_current_
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="optimized-cv-{session_id}.pdf"'},
     )
+
+
+@router.get("/{session_id}/cv/original/pdf")
+async def get_original_cv_pdf(
+    session_id: str,
+    token: str | None = Query(None),
+):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication token required")
+    
+    try:
+        user_payload = await verify_supabase_token(token)
+        user_id = user_payload["sub"]
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+        
+    session = db.get_session(session_id, user_id=user_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    cv_doc = session.get("cvDocument")
+    if not cv_doc:
+        raise HTTPException(status_code=404, detail="Original CV document not found")
+        
+    bucket = cv_doc.get("storage_bucket")
+    path = cv_doc.get("storage_path")
+    if not bucket or not path:
+        raise HTTPException(status_code=404, detail="CV file storage info not found")
+        
+    try:
+        pdf_bytes = storage_service.download_file(bucket, path)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "inline"},
+        )
+    except Exception as e:
+        logger.error(f"Failed to download original CV: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve CV file from storage")
+
+
+@router.get("/{session_id}/cv/original/text")
+async def get_original_cv_text(
+    session_id: str,
+    user: Annotated[dict, Depends(get_current_user)],
+):
+    session = db.get_session(session_id, user_id=user["sub"])
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    cv_doc = session.get("cvDocument")
+    cv_doc_id = cv_doc.get("id") if cv_doc else None
+    if not cv_doc_id:
+        cv_doc_id = session.get("cv_document_id")
+        
+    if not cv_doc_id:
+        raise HTTPException(status_code=404, detail="Original CV document not found")
+        
+    doc = db.get_document(cv_doc_id, user_id=user["sub"])
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    return {"raw_text": doc.get("raw_text") or ""}

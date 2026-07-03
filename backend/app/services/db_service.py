@@ -72,7 +72,7 @@ class DatabaseService:
         return self._table("interview_sessions").insert(data).execute().data[0]
 
     def get_session(self, session_id: str, user_id: str | None = None) -> dict | None:
-        q = self._table("interview_sessions").select("*, cvDocument:documents!cv_document_id(storage_bucket, storage_path)").eq("id", session_id)
+        q = self._table("interview_sessions").select("*, cvDocument:documents!cv_document_id(id, storage_bucket, storage_path)").eq("id", session_id)
         if user_id:
             q = q.eq("user_id", user_id)
         result = q.execute()

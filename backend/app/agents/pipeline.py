@@ -1,4 +1,6 @@
 import logging
+import re
+import unicodedata
 
 from app.agents.document_parser_agent import parse_documents
 from app.agents.evaluator_agent import evaluate_session
@@ -16,9 +18,51 @@ def _sanitize_text(text: str) -> str:
     """
     Sanitize text extracted from PDF/DOCX before saving to PostgreSQL.
     - Remove null bytes (\x00) which PostgreSQL does not support in text columns.
-    - Strip leading/trailing whitespaces (including newline before %PDF header).
+    - Normalize Unicode to NFC form to compose any decomposed characters.
+    - Clean up broken Vietnamese spaces around diacritics (commonly caused by PDF parsers).
+    - Normalize redundant bullet points/list symbols.
+    - Strip leading/trailing whitespaces.
     """
-    return text.replace("\x00", "").strip()
+    if not text:
+        return ""
+    
+    # Remove null bytes and normalize to NFC form
+    cleaned = unicodedata.normalize('NFC', text.replace("\x00", ""))
+    
+    # 1. Normalize bullet points / list symbols at the start of lines
+    # e.g., "- •", "- ·", "- .", "* •", "• -" -> "- "
+    bullets = r"[-*•●▪◦·]"
+    cleaned = re.sub(r"^\s*(%s)\s*(%s|\.)\s*" % (bullets, bullets), r"\1 ", cleaned, flags=re.MULTILINE)
+    
+    # 2. Vowels with diacritics
+    vowels = "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ"
+    vowels_upper = vowels.upper()
+    v_chars = vowels + vowels_upper + "đĐ"
+    
+    # Vowels that can NEVER start a word in Vietnamese:
+    # Heavy tone: ạ ặ ậ ẹ ệ ị ọ ộ ợ ụ ự ỵ
+    # Tilde tone: ã ẵ ẫ ẽ ễ ĩ õ ỗ ỡ ũ ữ ỹ
+    # Grave tone: à ằ ầ è ề ì ò ồ ờ ù ừ ỳ
+    # Acute tone (except ý, á, ú, ứ, ố, ớ, ế): ắ é
+    # Question tone (except ở, ổ, ỷ, ủ): ả ẳ ẩ ẻ ể ỉ ỏ ử
+    ns_chars = "ạặậẹệịọộợụựỵãẵẫẽễĩõỗỡũữỹàằầèềìòồờùừỳắéảẳẩẻểỉỏử"
+    ns_chars_upper = ns_chars.upper()
+    ns_chars_all = ns_chars + ns_chars_upper
+    
+    # 3. Match letter (including diacritics) + space + non-starting diacritic vowel (safe to merge)
+    cleaned = re.sub(r"([a-zA-Z%s])\s+([%s])" % (v_chars, ns_chars_all), r"\1\2", cleaned)
+    
+    # 4. Match diacritic vowel + space + ending consonant / glide vowel / ending cluster (ch, ng, nh)
+    # Standard endings in Vietnamese: c, m, n, p, t, g, ch, ng, nh, i, y, u, o
+    cleaned = re.sub(r"([%s])\s+([cmnptg]|ch|ng|nh|[iyuo])(?=\b|\s|$)" % v_chars, r"\1\2", cleaned)
+    
+    # 5. Match pure consonant prefix + space + any diacritic vowel
+    cleaned = re.sub(r"\b([b-df-hj-np-tv-xzđĐ]+)\s+([%s])" % v_chars, r"\1\2", cleaned)
+    
+    # Clean multiple spaces
+    cleaned = re.sub(r" {2,}", " ", cleaned)
+    
+    return cleaned.strip()
 
 
 async def run_document_pipeline(session_id: str, optimize_only: bool = False) -> None:

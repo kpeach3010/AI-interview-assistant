@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   SparklesIcon,
@@ -46,7 +46,7 @@ interface CandidateProfileData {
 export default function CVSuggestionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { accessToken } = useAuth();
-  const printRef = useRef<HTMLDivElement>(null);
+
 
   const [report, setReport] = useState<ReportData | null>(null);
   const [session, setSession] = useState<SessionResponse | null>(null);
@@ -54,22 +54,29 @@ export default function CVSuggestionPage() {
   const [loading, setLoading] = useState(true);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [rawText, setRawText] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"file" | "text">("text");
 
   useEffect(() => {
     if (!sessionId || !accessToken) return;
 
     const fetchData = async () => {
       try {
-        const [reportData, sessionData, profileData] = await Promise.all([
-          apiFetch<ReportData>(`/sessions/${sessionId}/report`, {}, accessToken).catch(() => null),
-          apiFetch<SessionResponse>(`/sessions/${sessionId}`, {}, accessToken).catch(() => null),
-          apiFetch<CandidateProfileData>(`/sessions/${sessionId}/candidate-profile`, {}, accessToken).catch(() => null)
+        const [reportData, sessionData, profileData, rawTextData] = await Promise.all([
+          apiFetch<ReportData>(`/sessions/${sessionId}/report`, {}, accessToken).catch((err) => { console.error("Fetch report failed:", err); return null; }),
+          apiFetch<SessionResponse>(`/sessions/${sessionId}`, {}, accessToken).catch((err) => { console.error("Fetch session failed:", err); return null; }),
+          apiFetch<CandidateProfileData>(`/sessions/${sessionId}/candidate-profile`, {}, accessToken).catch((err) => { console.error("Fetch profile failed:", err); return null; }),
+          apiFetch<{ raw_text: string }>(`/sessions/${sessionId}/cv/original/text`, {}, accessToken).catch((err) => { console.error("Fetch original text failed:", err); return null; })
         ]);
+        console.log("fetchData response - rawTextData:", rawTextData);
         if (sessionData) {
           setSession(sessionData);
         }
         if (profileData) {
           setProfile(profileData);
+        }
+        if (rawTextData) {
+          setRawText(rawTextData.raw_text);
         }
         if (reportData) {
           setReport(reportData);
@@ -130,6 +137,10 @@ export default function CVSuggestionPage() {
   const highSeverityCount = suggestions.filter(s => s.severity === 'high').length;
   const mediumSeverityCount = suggestions.filter(s => s.severity === 'medium').length;
   const lowSeverityCount = suggestions.filter(s => s.severity === 'low').length;
+
+  const originalCvUrl = session?.cv_url
+    ? `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/sessions/${sessionId}/cv/original/pdf?token=${accessToken}`
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 font-sans selection:bg-indigo-200 selection:text-indigo-900">
@@ -255,23 +266,40 @@ export default function CVSuggestionPage() {
                   </div>
                   CV gốc
                 </h3>
-                <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-500 shadow-sm">
-                  PDF Viewer
-                </span>
+                <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-semibold shadow-sm shrink-0">
+                  <button
+                    onClick={() => setViewMode("text")}
+                    className={`px-3 py-1 rounded-md transition-all ${viewMode === "text" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                  >
+                    Văn bản
+                  </button>
+                  <button
+                    onClick={() => setViewMode("file")}
+                    className={`px-3 py-1 rounded-md transition-all ${viewMode === "file" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                  >
+                    File gốc PDF/Word
+                  </button>
+                </div>
               </div>
               <div className="flex-1 p-2 md:p-3 relative group min-h-[400px]">
                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="relative h-full w-full bg-slate-50 rounded-2xl shadow-inner border border-slate-200 overflow-hidden">
-                {session?.cv_url ? (
+                {viewMode === "text" ? (
+                  <div className="absolute inset-0 p-4 md:p-6 overflow-y-auto bg-slate-50 text-slate-700 select-text">
+                    <div className="max-w-2xl mx-auto bg-white p-6 md:p-8 border border-slate-200/80 shadow-[0_4px_15px_rgba(0,0,0,0.03)] min-h-full rounded-2xl whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-800 tracking-wide">
+                      {rawText || "Không tìm thấy nội dung văn bản trích xuất từ CV."}
+                    </div>
+                  </div>
+                ) : originalCvUrl ? (
                   <>
                     <iframe
-                      src={session.cv_url}
+                      src={originalCvUrl}
                       className="w-full h-full border-0 absolute inset-0 bg-slate-100 z-0"
                       title="Original CV"
                     />
                     <div className="absolute top-4 right-4 z-10">
                       <a
-                        href={session.cv_url}
+                        href={originalCvUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-4 py-2 bg-white/90 backdrop-blur-sm border border-slate-200 text-sm font-semibold text-indigo-600 rounded-xl shadow-sm hover:bg-indigo-50 transition-colors flex items-center gap-2"
