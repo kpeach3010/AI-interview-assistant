@@ -57,8 +57,13 @@ async def review_cv(
             ],
         }
 
+    from datetime import datetime
+    current_year = datetime.now().year
     system_template = _load_prompt("cv_reviewer.txt")
-    system = system_template.format(language="Tiếng Việt" if language == "vi" else "English")
+    system = system_template.format(
+        language="Tiếng Việt" if language == "vi" else "English",
+        current_year=current_year
+    )
 
     user_prompt = f"""CV TEXT:
 {cv_text[:6000]}
