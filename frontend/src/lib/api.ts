@@ -154,3 +154,13 @@ export async function submitQuestionTiming(
     token
   );
 }
+
+export async function deleteSession(sessionId: string, token: string) {
+  return apiFetch<{ status: string; message: string }>(
+    `/sessions/${sessionId}`,
+    {
+      method: "DELETE",
+    },
+    token
+  );
+}

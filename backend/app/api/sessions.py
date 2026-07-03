@@ -121,6 +121,16 @@ async def get_session(session_id: str, user: Annotated[dict, Depends(get_current
     return _session_to_response(session)
 
 
+@router.delete("/{session_id}")
+async def delete_session(session_id: str, user: Annotated[dict, Depends(get_current_user)]):
+    session = db.get_session(session_id, user["sub"])
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    db.delete_session(session_id, user["sub"])
+    return {"status": "success", "message": "Session deleted successfully"}
+
+
 @router.get("/{session_id}/questions", response_model=list[QuestionResponse])
 async def get_questions(session_id: str, user: Annotated[dict, Depends(get_current_user)]):
     session = db.get_session(session_id, user["sub"])

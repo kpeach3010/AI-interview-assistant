@@ -216,5 +216,11 @@ class DatabaseService:
         )
         return result.data[0] if result.data else None
 
+    def delete_session(self, session_id: str, user_id: str | None = None) -> None:
+        q = self._table("interview_sessions").delete().eq("id", session_id)
+        if user_id:
+            q = q.eq("user_id", user_id)
+        q.execute()
+
 
 db_service = DatabaseService()

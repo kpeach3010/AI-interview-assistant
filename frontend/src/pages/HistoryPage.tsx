@@ -15,12 +15,14 @@ import {
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
   SparklesIcon,
-  PresentationChartLineIcon
+  PresentationChartLineIcon,
+  TrashIcon,
+  ExclamationTriangleIcon
 } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/24/solid";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
-import { apiFetch, type Session } from "../lib/api";
+import { apiFetch, type Session, deleteSession } from "../lib/api";
 import {
   LineChart,
   Line,
@@ -95,6 +97,24 @@ export default function HistoryPage() {
   const [activeTab, setActiveTab] = useState<"list" | "cv_list" | "analytics">("list");
   const navigate = useNavigate();
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
+
+  const handleDeleteSession = async () => {
+    if (!sessionToDelete || !accessToken) return;
+    setDeletingId(sessionToDelete.id);
+    try {
+      await deleteSession(sessionToDelete.id, accessToken);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionToDelete.id));
+      setSessionToDelete(null);
+    } catch (error) {
+      console.error("Lỗi khi xóa session:", error);
+      alert("Không thể xóa phiên. Vui lòng thử lại sau.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const completedSessions = sessions.filter((s) => s.status === "completed" && s.overall_score !== undefined && s.overall_score !== null);
 
   const trendData = [...completedSessions]
@@ -158,46 +178,49 @@ export default function HistoryPage() {
     );
   }
 
+  const totalInterviews = sessions.filter(s => !(s.title && (s.title.startsWith("Tối ưu CV") || s.title.includes("[CV_OPT]"))) && !(s.position_applied && s.position_applied.includes("[CV_OPT]"))).length;
+  const totalCvOptimizations = sessions.length - totalInterviews;
+
   const completedCount = sessions.filter((s) => s.status === "completed").length;
 
-  const filteredSessions = sessions.filter((s) => {
-    if (s.title && (s.title.startsWith("Tối ưu CV") || s.title.includes("[CV_OPT]"))) return false; // Hide CV optimization sessions
+  const interviewSessionsSearchFiltered = sessions.filter((s) => {
+    if (s.title && (s.title.startsWith("Tối ưu CV") || s.title.includes("[CV_OPT]"))) return false;
     if (s.position_applied && s.position_applied.includes("[CV_OPT]")) return false;
     
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch =
-      (s.title || s.position_applied || "").toLowerCase().includes(searchLower) ||
-      (s.industry || "").toLowerCase().includes(searchLower);
-
-    let matchesStatus = true;
-    if (statusFilter === "completed") {
-      matchesStatus = s.status === "completed";
-    } else if (statusFilter === "processing") {
-      matchesStatus = ["draft", "parsing", "ready", "active", "evaluating"].includes(s.status);
-    }
-
-    return matchesSearch && matchesStatus;
+    return (s.title || s.position_applied || "").toLowerCase().includes(searchLower) ||
+           (s.industry || "").toLowerCase().includes(searchLower);
   });
 
-  const filteredCvSessions = sessions.filter((s) => {
+  const filteredSessions = interviewSessionsSearchFiltered.filter(s => {
+    if (statusFilter === "completed") return s.status === "completed";
+    if (statusFilter === "processing") return ["draft", "parsing", "ready", "active", "evaluating"].includes(s.status);
+    return true;
+  });
+
+  const interviewAllCount = interviewSessionsSearchFiltered.length;
+  const interviewProcessingCount = interviewSessionsSearchFiltered.filter(s => ["draft", "parsing", "ready", "active", "evaluating"].includes(s.status)).length;
+  const interviewCompletedCount = interviewSessionsSearchFiltered.filter(s => s.status === "completed").length;
+
+  const cvSessionsSearchFiltered = sessions.filter((s) => {
     const isCvOpt = (s.title && (s.title.startsWith("Tối ưu CV") || s.title.includes("[CV_OPT]"))) ||
                     (s.position_applied && s.position_applied.includes("[CV_OPT]"));
     if (!isCvOpt) return false;
     
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch =
-      (s.title || s.position_applied || "").toLowerCase().includes(searchLower) ||
-      (s.industry || "").toLowerCase().includes(searchLower);
-
-    let matchesStatus = true;
-    if (statusFilter === "completed") {
-      matchesStatus = s.status === "completed";
-    } else if (statusFilter === "processing") {
-      matchesStatus = ["draft", "parsing", "ready", "active", "evaluating"].includes(s.status);
-    }
-
-    return matchesSearch && matchesStatus;
+    return (s.title || s.position_applied || "").toLowerCase().includes(searchLower) ||
+           (s.industry || "").toLowerCase().includes(searchLower);
   });
+
+  const filteredCvSessions = cvSessionsSearchFiltered.filter(s => {
+    if (statusFilter === "completed") return s.status === "completed";
+    if (statusFilter === "processing") return ["draft", "parsing", "ready", "active", "evaluating"].includes(s.status);
+    return true;
+  });
+
+  const cvAllCount = cvSessionsSearchFiltered.length;
+  const cvProcessingCount = cvSessionsSearchFiltered.filter(s => ["draft", "parsing", "ready", "active", "evaluating"].includes(s.status)).length;
+  const cvCompletedCount = cvSessionsSearchFiltered.filter(s => s.status === "completed").length;
 
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-6 md:py-8 pb-20 font-sans min-h-screen">
@@ -240,7 +263,7 @@ export default function HistoryPage() {
               </div>
               <div className="relative z-10">
                 <p className="text-slate-500 font-bold text-[11px] uppercase tracking-wider mb-0.5 group-hover:text-violet-600 transition-colors">Tổng số phỏng vấn</p>
-                <h4 className="text-2xl sm:text-3xl font-black text-slate-800">{sessions.length}</h4>
+                <h4 className="text-2xl sm:text-3xl font-black text-slate-800">{totalInterviews}</h4>
               </div>
             </div>
             <div className="bg-gradient-to-br from-white to-slate-50/80 backdrop-blur-xl rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(16,185,129,0.08)] transition-all duration-300 group relative overflow-hidden">
@@ -252,11 +275,11 @@ export default function HistoryPage() {
               </motion.div>
               <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-emerald-500 opacity-5 blur-2xl group-hover:opacity-10 transition-opacity duration-300"></div>
               <div className="relative z-10 w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 shadow-inner">
-                <CheckCircleIcon className="w-7 h-7 text-emerald-600 group-hover:text-white transition-colors duration-300" />
+                <DocumentTextIcon className="w-7 h-7 text-emerald-600 group-hover:text-white transition-colors duration-300" />
               </div>
               <div className="relative z-10">
-                <p className="text-slate-500 font-bold text-[11px] uppercase tracking-wider mb-0.5 group-hover:text-emerald-600 transition-colors">Phỏng vấn đã hoàn thành</p>
-                <h4 className="text-2xl sm:text-3xl font-black text-slate-800">{completedCount}</h4>
+                <p className="text-slate-500 font-bold text-[11px] uppercase tracking-wider mb-0.5 group-hover:text-emerald-600 transition-colors">Tổng số CV tối ưu</p>
+                <h4 className="text-2xl sm:text-3xl font-black text-slate-800">{totalCvOptimizations}</h4>
               </div>
             </div>
           </motion.div>
@@ -351,7 +374,7 @@ export default function HistoryPage() {
                             }`}
                         >
                           <span className={`w-2 h-2 rounded-full ${statusFilter === "processing" ? "bg-amber-500 animate-pulse" : "bg-slate-400"}`}></span>
-                          Đang xử lý
+                          Đang xử lý ({interviewProcessingCount})
                         </button>
                         <button
                           onClick={() => setStatusFilter("completed")}
@@ -359,7 +382,7 @@ export default function HistoryPage() {
                             }`}
                         >
                           <CheckCircleIcon className="w-4 h-4" />
-                          Hoàn thành
+                          Hoàn thành ({interviewCompletedCount})
                         </button>
                       </div>
                     </div>
@@ -460,6 +483,16 @@ export default function HistoryPage() {
                                 ) : (
                                   <div className="w-5 h-5 shrink-0" />
                                 )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSessionToDelete(s);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                                  title="Xóa phiên"
+                                >
+                                  <TrashIcon className="w-5 h-5" />
+                                </button>
                               </div>
                             </motion.div>
                           );
@@ -500,7 +533,7 @@ export default function HistoryPage() {
                             }`}
                         >
                           <span className={`w-2 h-2 rounded-full ${statusFilter === "processing" ? "bg-amber-500 animate-pulse" : "bg-slate-400"}`}></span>
-                          Đang xử lý
+                          Đang xử lý ({cvProcessingCount})
                         </button>
                         <button
                           onClick={() => setStatusFilter("completed")}
@@ -508,7 +541,7 @@ export default function HistoryPage() {
                             }`}
                         >
                           <CheckCircleIcon className="w-4 h-4" />
-                          Hoàn thành
+                          Hoàn thành ({cvCompletedCount})
                         </button>
                       </div>
                     </div>
@@ -590,6 +623,16 @@ export default function HistoryPage() {
                                 <div className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 px-3.5 py-2 rounded-lg group-hover:bg-gradient-to-r group-hover:from-violet-600 group-hover:to-indigo-600 group-hover:text-white transition-all shadow-sm hover:shadow-md">
                                   Xem kết quả tối ưu <SparklesIcon className="w-3.5 h-3.5" />
                                 </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSessionToDelete(s);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                                  title="Xóa phiên tối ưu CV"
+                                >
+                                  <TrashIcon className="w-5 h-5" />
+                                </button>
                               </div>
                             </motion.div>
                           );
@@ -882,6 +925,61 @@ export default function HistoryPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {sessionToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSessionToDelete(null)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative z-10 border border-slate-100"
+            >
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-5 border border-red-100 shadow-inner">
+                <ExclamationTriangleIcon className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 text-center mb-2">
+                Xóa phiên này?
+              </h3>
+              <p className="text-slate-500 text-sm font-medium text-center mb-8">
+                Bạn có chắc chắn muốn xóa phiên <span className="font-bold text-slate-700">"{sessionToDelete.title || sessionToDelete.position_applied || "Không xác định"}"</span>? Hành động này không thể hoàn tác.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSessionToDelete(null)}
+                  disabled={deletingId !== null}
+                  className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={handleDeleteSession}
+                  disabled={deletingId !== null}
+                  className="flex-1 py-3 px-4 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {deletingId === sessionToDelete.id ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Đang xóa...
+                    </>
+                  ) : (
+                    "Xóa ngay"
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
