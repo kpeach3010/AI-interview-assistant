@@ -200,9 +200,9 @@ export default function HistoryPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 pb-20 font-sans min-h-screen">
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-6 md:py-8 pb-20 font-sans min-h-screen">
       <div className="grid lg:grid-cols-3 gap-8 items-start">
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 min-w-0">
 
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -210,10 +210,10 @@ export default function HistoryPage() {
             className="flex items-center justify-between"
           >
             <div>
-              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700 tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-700 tracking-tight">
                 Lịch sử <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-indigo-600">phỏng vấn</span>
               </h1>
-              <p className="text-slate-500 mt-2 font-medium flex items-center gap-2 text-base">
+              <p className="text-slate-500 mt-1.5 font-medium flex items-center gap-2 text-sm sm:text-base">
                 <ClockIcon className="w-6 h-6 text-violet-500" />
                 Xem lại các phiên phỏng vấn và kết quả đánh giá của bạn
               </p>
@@ -240,7 +240,7 @@ export default function HistoryPage() {
               </div>
               <div className="relative z-10">
                 <p className="text-slate-500 font-bold text-[11px] uppercase tracking-wider mb-0.5 group-hover:text-violet-600 transition-colors">Tổng số phỏng vấn</p>
-                <h4 className="text-3xl font-black text-slate-800">{sessions.length}</h4>
+                <h4 className="text-2xl sm:text-3xl font-black text-slate-800">{sessions.length}</h4>
               </div>
             </div>
             <div className="bg-gradient-to-br from-white to-slate-50/80 backdrop-blur-xl rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex items-center gap-4 hover:border-emerald-200 hover:shadow-[0_8px_30px_rgba(16,185,129,0.08)] transition-all duration-300 group relative overflow-hidden">
@@ -256,7 +256,7 @@ export default function HistoryPage() {
               </div>
               <div className="relative z-10">
                 <p className="text-slate-500 font-bold text-[11px] uppercase tracking-wider mb-0.5 group-hover:text-emerald-600 transition-colors">Phỏng vấn đã hoàn thành</p>
-                <h4 className="text-3xl font-black text-slate-800">{completedCount}</h4>
+                <h4 className="text-2xl sm:text-3xl font-black text-slate-800">{completedCount}</h4>
               </div>
             </div>
           </motion.div>
@@ -292,10 +292,10 @@ export default function HistoryPage() {
           ) : (
             <>
               {/* Tab Selector */}
-              <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 w-max h-[44px] items-center mb-6">
+              <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 w-full sm:w-max min-w-0 overflow-x-auto h-auto sm:h-[44px] items-center mb-6" style={{ scrollbarWidth: 'none' }}>
                 <button
                   onClick={() => setActiveTab("list")}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${activeTab === "list" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === "list" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                     }`}
                 >
                   <ClockIcon className="w-4 h-4" />
@@ -303,7 +303,7 @@ export default function HistoryPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("cv_list")}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${activeTab === "cv_list" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                  className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === "cv_list" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                     }`}
                 >
                   <DocumentTextIcon className="w-4 h-4" />
@@ -312,7 +312,7 @@ export default function HistoryPage() {
                 {completedCount > 0 && (
                   <button
                     onClick={() => setActiveTab("analytics")}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${activeTab === "analytics" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                    className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === "analytics" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                       }`}
                   >
                     <PresentationChartLineIcon className="w-4 h-4" />
@@ -325,7 +325,7 @@ export default function HistoryPage() {
                 <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-slate-200/60 shadow-[0_10px_40px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col relative z-10 animate-fade-in">
                   <div className="p-5 md:p-6 border-b border-slate-200/60 bg-white/40">
                     <div className="flex flex-col sm:flex-row gap-3 w-full">
-                      <div className="relative w-full flex-1 group">
+                      <div className="relative w-full flex-1 min-w-0 group">
                         <div className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:bg-violet-200 group-focus-within:bg-violet-600 group-focus-within:text-white group-focus-within:scale-105 shadow-sm z-10">
                           <MagnifyingGlassIcon className="w-5 h-5 stroke-[2.5]" />
                         </div>
@@ -337,17 +337,17 @@ export default function HistoryPage() {
                           className="w-full pl-14 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/15 bg-white/80 backdrop-blur-xl transition-all shadow-sm text-sm font-medium hover:border-violet-300"
                         />
                       </div>
-                      <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 shrink-0 h-[48px] items-center">
+                      <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 shrink-0 h-auto sm:h-[48px] items-center overflow-x-auto w-full sm:w-auto min-w-0" style={{ scrollbarWidth: 'none' }}>
                         <button
                           onClick={() => setStatusFilter("all")}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "all" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${statusFilter === "all" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                             }`}
                         >
                           Tất cả
                         </button>
                         <button
                           onClick={() => setStatusFilter("processing")}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "processing" ? "bg-white text-amber-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${statusFilter === "processing" ? "bg-white text-amber-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                             }`}
                         >
                           <span className={`w-2 h-2 rounded-full ${statusFilter === "processing" ? "bg-amber-500 animate-pulse" : "bg-slate-400"}`}></span>
@@ -355,7 +355,7 @@ export default function HistoryPage() {
                         </button>
                         <button
                           onClick={() => setStatusFilter("completed")}
-                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "completed" ? "bg-white text-emerald-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${statusFilter === "completed" ? "bg-white text-emerald-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                             }`}
                         >
                           <CheckCircleIcon className="w-4 h-4" />
@@ -411,7 +411,7 @@ export default function HistoryPage() {
 
                               <div className="absolute inset-0 bg-gradient-to-r from-violet-50/30 to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
 
-                              <div className="flex-1 relative z-10">
+                              <div className="flex-1 min-w-0 relative z-10">
                                 <div className="flex items-center gap-3 mb-2.5">
                                   <StatusBadge status={s.status} />
                                   <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
@@ -426,7 +426,7 @@ export default function HistoryPage() {
                                   </span>
                                 </div>
 
-                                <h3 className="text-lg font-extrabold text-slate-800 mb-2.5 group-hover:text-violet-700 transition-colors">
+                                <h3 className="text-base sm:text-lg font-extrabold text-slate-800 mb-2.5 group-hover:text-violet-700 transition-colors truncate" title={s.title || s.position_applied || "Vị trí không xác định"}>
                                   {s.title || s.position_applied || "Vị trí không xác định"}
                                 </h3>
 
@@ -474,7 +474,7 @@ export default function HistoryPage() {
                 <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-slate-200/60 shadow-[0_10px_40px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col relative z-10 animate-fade-in">
                   <div className="p-5 md:p-6 border-b border-slate-200/60 bg-white/40">
                     <div className="flex flex-col sm:flex-row gap-3 w-full">
-                      <div className="relative w-full flex-1 group">
+                      <div className="relative w-full flex-1 min-w-0 group">
                         <div className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:bg-violet-200 group-focus-within:bg-violet-600 group-focus-within:text-white group-focus-within:scale-105 shadow-sm z-10">
                           <MagnifyingGlassIcon className="w-5 h-5 stroke-[2.5]" />
                         </div>
@@ -486,7 +486,7 @@ export default function HistoryPage() {
                           className="w-full pl-14 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-500/15 bg-white/80 backdrop-blur-xl transition-all shadow-sm text-sm font-medium hover:border-violet-300"
                         />
                       </div>
-                      <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 shrink-0 h-[48px] items-center">
+                      <div className="flex bg-slate-100/80 backdrop-blur-xl p-1 rounded-xl border border-slate-200/60 shrink-0 h-auto sm:h-[48px] items-center overflow-x-auto w-full sm:w-auto min-w-0" style={{ scrollbarWidth: 'none' }}>
                         <button
                           onClick={() => setStatusFilter("all")}
                           className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === "all" ? "bg-white text-violet-700 shadow-[0_2px_8px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
@@ -553,7 +553,7 @@ export default function HistoryPage() {
 
                               <div className="absolute inset-0 bg-gradient-to-r from-violet-50/30 to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
 
-                              <div className="flex-1 relative z-10">
+                              <div className="flex-1 min-w-0 relative z-10">
                                 <div className="flex items-center gap-3 mb-2.5">
                                   <StatusBadge status={s.status} />
                                   <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
@@ -568,7 +568,7 @@ export default function HistoryPage() {
                                   </span>
                                 </div>
 
-                                <h3 className="text-lg font-extrabold text-slate-800 mb-2.5 group-hover:text-violet-700 transition-colors">
+                                <h3 className="text-base sm:text-lg font-extrabold text-slate-800 mb-2.5 group-hover:text-violet-700 transition-colors truncate" title={s.title || s.position_applied || "Vị trí tối ưu không xác định"}>
                                   {s.title || s.position_applied || "Vị trí tối ưu không xác định"}
                                 </h3>
 
@@ -805,7 +805,7 @@ export default function HistoryPage() {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="lg:col-span-1 space-y-6"
+          className="lg:col-span-1 space-y-6 min-w-0"
         >
           {/* CTA Khung Tím - Cột phải */}
           <div className="bg-gradient-to-br from-violet-700 to-indigo-900 rounded-3xl p-6 text-white shadow-[0_15px_30px_rgba(124,58,237,0.2)] relative overflow-hidden">

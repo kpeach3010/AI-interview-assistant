@@ -6,3 +6,9 @@ body {
   font-family: 'Inter', sans-serif;
   @apply bg-slate-50 text-slate-900 antialiased;
 }
+
+#root {
+  width: 100%;
+  margin: 0 auto;
+  text-align: left;
+}

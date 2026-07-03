@@ -181,8 +181,7 @@ export default function LandingPage() {
         {/* ── HERO SECTION ── */}
         <section style={{
           position: "relative",
-          maxWidth: 1400, margin: "0 auto", padding: "3rem 2rem 6rem",
-          minHeight: "calc(100vh - 68px)",
+          maxWidth: 1400, margin: "0 auto", padding: "3rem 2rem 3rem",
           display: "flex", flexDirection: "column", alignItems: "center"
         }}>
 
@@ -203,7 +202,7 @@ export default function LandingPage() {
           </div>
 
           {/* Carousel & Centered Overlay Container */}
-          <div style={{ position: "relative", width: "100%", zIndex: 10, marginBottom: "4rem" }}>
+          <div style={{ position: "relative", width: "100%", zIndex: 10, marginBottom: "2rem" }}>
 
             {/* Hero Image */}
             <div className="anim-hero anim-delay2 w-full max-w-[900px] mx-auto aspect-video rounded-3xl overflow-hidden bg-white flex items-center justify-center relative shadow-[0_20px_50px_rgba(124,58,237,0.18)]">
@@ -218,49 +217,38 @@ export default function LandingPage() {
               />
             </div>
 
-            {/* Overlays Container (Responsive flexbox) */}
-            <div className="absolute -bottom-10 md:-bottom-12 left-1/2 -translate-x-1/2 w-full max-w-[1100px] px-4 md:px-10 flex flex-col md:flex-row items-center justify-between gap-6 z-20 pointer-events-none">
-              
-              {/* Text Card */}
-              <div className="anim-hero anim-delay3 w-full md:max-w-[420px] pointer-events-auto bg-white/85 backdrop-blur-xl p-5 md:p-6 rounded-3xl border border-white/60 shadow-[0_24px_48px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.05)] flex flex-col gap-3">
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 0 4px rgba(16, 185, 129, 0.15)" }} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#10b981", letterSpacing: 0.5, textTransform: "uppercase" }}>Sẵn sàng</span>
-                </div>
-                <p style={{ fontSize: 16, color: "#334155", lineHeight: 1.6, margin: 0, fontWeight: 500 }}>
-                  Phân tích CV, luyện phỏng vấn thực tế và nhận <span style={{ color: "#7c3aed", fontWeight: 700 }}>đánh giá chi tiết</span> để tự tin hơn trên hành trình tìm việc.
-                </p>
-              </div>
+            {/* Content Below Image */}
+            <div className="w-full max-w-[900px] mx-auto mt-8 px-4 flex flex-col md:flex-row items-center justify-center gap-4 z-20">
 
               {/* Buttons */}
-              <div className="anim-hero anim-delay3 flex flex-wrap justify-center gap-3 pointer-events-auto w-full md:w-auto">
+              <div className="anim-hero anim-delay3 flex flex-wrap justify-center gap-3 w-full md:w-auto">
                 {user ? (
                   <Link to="/dashboard" style={{
-                    background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)", color: "white", padding: "14px 28px",
-                    borderRadius: 99, fontWeight: 600, fontSize: 15, textDecoration: "none",
+                    background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)", color: "white", padding: "16px 32px",
+                    borderRadius: 99, fontWeight: 600, fontSize: 16, textDecoration: "none",
                     boxShadow: "0 10px 25px rgba(124, 58, 237, 0.3)",
                     transition: "transform 0.15s, opacity 0.2s"
-                  }} className="btn-primary w-full sm:w-auto text-center">
+                  }} className="btn-primary w-full sm:w-auto text-center hover:-translate-y-1">
                     Tạo phiên phỏng vấn ↗
                   </Link>
                 ) : (
                   <>
                     <Link to="/register" style={{
-                      background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)", color: "white", padding: "14px 28px",
-                      borderRadius: 99, fontWeight: 600, fontSize: 15, textDecoration: "none",
+                      background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)", color: "white", padding: "16px 32px",
+                      borderRadius: 99, fontWeight: 600, fontSize: 16, textDecoration: "none",
                       boxShadow: "0 10px 25px rgba(124, 58, 237, 0.3)",
                       transition: "transform 0.15s, opacity 0.2s",
                       whiteSpace: "nowrap"
-                    }} className="btn-primary w-full sm:w-auto text-center">
+                    }} className="btn-primary w-full sm:w-auto text-center hover:-translate-y-1">
                       Luyện tập miễn phí ↗
                     </Link>
                     <Link to="/login" style={{
                       background: "rgba(255,255,255,0.9)", backdropFilter: "blur(12px)",
-                      color: "#475569", padding: "14px 24px",
-                      borderRadius: 99, fontWeight: 600, fontSize: 15, textDecoration: "none",
+                      color: "#475569", padding: "16px 32px",
+                      borderRadius: 99, fontWeight: 600, fontSize: 16, textDecoration: "none",
                       border: "1.5px solid #e2e8f0", boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
                       transition: "background 0.2s"
-                    }} className="btn-ghost w-full sm:w-auto text-center">
+                    }} className="btn-ghost w-full sm:w-auto text-center hover:bg-slate-50">
                       Đăng nhập
                     </Link>
                   </>
@@ -277,7 +265,7 @@ export default function LandingPage() {
             {[
               { num: "10–15 câu hỏi", label: "Câu hỏi cá nhân hoá từ CV của bạn" },
               { num: "2 ngôn ngữ", label: "Hỗ trợ Tiếng Việt & English" },
-              { num: "4 tiêu chí", label: "Đánh giá Nội dung · Liên quan · Đầy đủ · Trình bày" },
+              { num: "4 tiêu chí đánh giá", label: "Nội dung · Liên quan · Đầy đủ · Trình bày" },
             ].map(({ num, label }) => (
               <div key={num} style={{ padding: "1rem" }}>
                 <div style={{ fontSize: "1.8rem", fontWeight: 900, color: "#7c3aed", letterSpacing: -0.5 }}>{num}</div>
@@ -311,7 +299,7 @@ export default function LandingPage() {
                 background: "#f8fafc",
                 borderRadius: 32,
                 overflow: "hidden",
-                height: 480,
+                aspectRatio: "16/10",
                 position: "relative",
                 boxShadow: "0 20px 40px rgba(0,0,0,0.03)",
                 border: "1.5px solid #f1f5f9",
@@ -340,12 +328,13 @@ export default function LandingPage() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-              style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "3.5rem" }}
+              className="mt-0 lg:mt-14"
+              style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
             >
 
               {/* Step numbers & Thumbnails */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex gap-3 items-center flex-1 min-w-[200px]">
                   {SOLUTIONS.map((item, idx) => {
                     const isActive = idx === activeSolution;
                     return (
@@ -391,7 +380,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Thumbnails of inactive slides */}
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="flex gap-2">
                   {SOLUTIONS.map((item, idx) => (
                     <button
                       key={idx}
@@ -425,14 +414,7 @@ export default function LandingPage() {
                 position: "relative",
                 transition: "all 0.3s ease"
               }}>
-                <div style={{
-                  fontSize: "2.8rem",
-                  fontWeight: 900,
-                  color: "#7c3aed",
-                  letterSpacing: -1,
-                  lineHeight: 1,
-                  marginBottom: 16
-                }}>
+                <div className="text-4xl md:text-5xl font-black text-purple-600 tracking-tight mb-4 leading-none">
                   {SOLUTIONS[activeSolution].metric}
                 </div>
 
@@ -488,7 +470,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── GUIDE SECTION ── */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
@@ -638,7 +620,7 @@ export default function LandingPage() {
         </motion.section>
 
         {/* ── COMPARISON SECTION ── */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
@@ -760,7 +742,7 @@ export default function LandingPage() {
         </motion.section>
 
         {/* ── FAQ SECTION ── */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
@@ -833,7 +815,7 @@ export default function LandingPage() {
         </motion.section>
 
         {/* ── CTA BANNER ── */}
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true, margin: "-100px" }}
