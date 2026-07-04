@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Environment (KHÔNG bao giờ commit .env)
+.env
+.env.*
+
+# Prisma generated
+prisma/generated/
+
+# Logs
+*.log
+logs/
+
+# Temp / uploads
+tmp/
+temp/
+uploads/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
