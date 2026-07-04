@@ -41,3 +41,6 @@ uploads/
 # Coverage
 .coverage
 htmlcov/
+
+# Supabase Temp
+supabase/.temp/
